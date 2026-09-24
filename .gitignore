@@ -1,0 +1,11 @@
+# Game-derived or third-party material: never commit
+ref/
+extract/
+vendor/
+downloads/
+saves/
+shots/
+# Build output
+build/
+Native/target/
+__pycache__/

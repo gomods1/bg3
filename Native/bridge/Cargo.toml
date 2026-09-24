@@ -1,0 +1,13 @@
+[package]
+name = "bg3access_bridge"
+version = "0.1.0"
+edition = "2021"
+description = "BG3 Access native bridge: speech (Prism) and the Lua message channel"
+
+[lib]
+name = "BG3AccessBridge"
+crate-type = ["cdylib"]
+
+[dependencies]
+retour = "0.3"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_System_SystemServices", "Win32_System_Pipes", "Win32_System_IO", "Win32_UI_Shell", "Win32_System_Com", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_UI_Input_KeyboardAndMouse"] }

@@ -1,0 +1,12 @@
+[package]
+name = "bg3access_proxy"
+version = "0.1.0"
+edition = "2021"
+description = "version.dll proxy that loads the BG3 Access bridge into the game process"
+
+[lib]
+name = "version"
+crate-type = ["cdylib"]
+
+[dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_System_SystemServices"] }
