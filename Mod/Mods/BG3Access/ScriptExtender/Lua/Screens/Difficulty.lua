@@ -1,44 +1,54 @@
--- New game difficulty (widget DMSettings, view model gui::DCDMSettings). The game's own Left/Right
--- change the preset; we announce the selected preset (PresetList.SelectedItem, a gui::VMPreset with
--- Title/Description handles and IsHonour) whenever it changes. Up/Down/Enter use the generic list.
-local Ui = Ext.Require("Game/Ui.lua")
+-- New game difficulty (Game/Difficulty). The game's own Left/Right change the preset (the list
+-- does not claim them); the selected preset is announced on open and whenever it changes. The rest
+-- of the screen is the generic list.
+local Game = Ext.Require("Game/Difficulty.lua")
 local Speech = Ext.Require("Core/Speech.lua")
-local Text = Ext.Require("Core/Text.lua")
+local Strings = Ext.Require("Core/Strings.lua")
 local Generic = Ext.Require("Screens/Generic.lua")
+local ListScreen = Ext.Require("Screens/ListScreen.lua")
 
-local Difficulty = setmetatable({}, { __index = Generic })
-Difficulty.__index = Difficulty
+local L = Strings.Get
+
+local Difficulty = ListScreen.Extend(Generic)
+Difficulty.Widgets = { Game.Widget }
 
 function Difficulty.New(widget, page)
-    local self = Generic.New(widget, page, "Choose difficulty")
-    setmetatable(self, Difficulty)
+    -- Buttons only: the page's crossplay texts are hidden tooltips.
+    local self = setmetatable(Generic.New(widget, page, { title = L("screen_difficulty"), buttonsOnly = true }), Difficulty)
     self.lastPreset = nil
     return self
 end
 
-function Difficulty:Selected()
-    local list = Ui.FindElement(self.widget, "PresetList")
-    local sel = list and Ui.Prop(list, "SelectedItem")
-    if not sel then return nil end
-    local title = Ui.Loca(Ui.Prop(sel, "Title"))
-    local desc = Text.Clean(Ui.Loca(Ui.Prop(sel, "Description")))
-    return title, desc, Ui.Prop(sel, "IsHonour") == true
+local function presetText(p)
+    return Strings.Sentences({ Strings.List({ p.title or "?", p.honour and L("honour_warning") }), p.description })
 end
 
 function Difficulty:Open()
-    local title, desc, honour = self:Selected()
-    self.lastPreset = title
-    Speech.Say(string.format("Choose difficulty. %s%s. %s. Left and right arrows change it.",
-        title or "?", honour and ", Honour mode: one save, deleted if the party dies" or "", desc or ""))
+    self:Refresh()
+    local p = Game.Selected() or {}
+    self.lastPreset = p.title
+    Speech.Say(Strings.Sentences({ L("screen_difficulty"), presetText(p), Strings.Sentences(self:Help()) }))
+end
+
+function Difficulty:ReadAll()
+    local parts = { L("screen_difficulty"), presetText(Game.Selected() or {}) }
+    for _, c in ipairs(self.controls) do parts[#parts + 1] = c.Describe() end
+    Speech.Say(Strings.Sentences(parts), { interrupt = true })
 end
 
 function Difficulty:Tick()
-    local title, desc, honour = self:Selected()
-    if title and title ~= self.lastPreset then
-        self.lastPreset = title
-        Speech.Say(string.format("%s%s. %s", title,
-            honour and ", Honour mode: one save, deleted if the party dies" or "", desc or ""), { interrupt = true })
+    ListScreen.Tick(self)
+    local p = Game.Selected()
+    if p and p.title and p.title ~= self.lastPreset then
+        self.lastPreset = p.title
+        Speech.Say(presetText(p), { interrupt = true })
     end
+end
+
+function Difficulty:Help()
+    local lines = Generic.Help(self)
+    table.insert(lines, 1, L("help_difficulty"))
+    return lines
 end
 
 return Difficulty

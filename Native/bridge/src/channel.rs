@@ -87,7 +87,7 @@ fn unescape(s: &str) -> String {
 }
 
 /// One message per line (see gate.md 4.3):
-/// `say <interrupt 0|1> <channel> <ttlMs> <text>`, `stop`, `hello <modVersion>`, `log <text>`,
+/// `say <interrupt 0|1> <channel> <ttlMs> <text>`, `stop`, `speech reset`, `hello <modVersion>`, `log <text>`,
 /// `mouse move <fx> <fy>` (fractions of the client area), `mouse click <left|right>`.
 fn dispatch(line: &str) {
     let line = line.trim_end_matches('\r');
@@ -102,7 +102,9 @@ fn dispatch(line: &str) {
             crate::speech::say(&text, interrupt);
         }
         "stop" => crate::speech::stop(),
+        "speech" if rest == "reset" => crate::speech::reset(),
         "hello" => {
+            crate::watchdog::hello();
             crate::log::info(&format!("hello from Lua: {rest}"));
             crate::write_status(&format!("hello {rest}"));
         }

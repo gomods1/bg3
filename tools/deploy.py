@@ -123,8 +123,14 @@ def sync_loose():
     shutil.copytree(os.path.join(REPO, "Mod", "Mods", "BG3Access", "ScriptExtender"), os.path.join(dst, "ScriptExtender"))
 
 
+def check_strings():
+    """The strings checker (tools/check_strings.py): a duplicate or missing key is a bug."""
+    run([sys.executable, os.path.join(REPO, "tools", "check_strings.py")])
+
+
 def main():
     lua_only = "--lua" in sys.argv
+    check_strings()
     if not lua_only:
         build_native()
     pak = pack_mod()

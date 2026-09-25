@@ -9,7 +9,13 @@ use std::time::{Duration, Instant};
 
 use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryExW, LOAD_WITH_ALTERED_SEARCH_PATH};
 
+const FEATURE_SUPPORTS_BRAILLE: u64 = 1 << 4;
 const FEATURE_SUPPORTS_OUTPUT: u64 = 1 << 5;
+
+/// While speaking through a TTS engine (a backend without braille: SAPI, OneCore), look for a
+/// screen reader again this often, so one started or restarted later is picked up (a screen reader
+/// that quits is already handled: speaking fails and the backend is recreated).
+const RECHECK_INTERVAL: Duration = Duration::from_secs(5);
 
 type InitFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
 type CreateBestFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
@@ -35,6 +41,7 @@ struct Api {
 enum Job {
     Say { text: String, interrupt: bool },
     Stop,
+    Reset,
 }
 
 struct Queue {
@@ -64,6 +71,13 @@ pub fn say(text: &str, interrupt: bool) {
         q.jobs.clear();
     }
     q.jobs.push_back(Job::Say { text: text.to_string(), interrupt });
+    WAKE.notify_one();
+}
+
+/// Chooses the best backend again (the mod's "reset speech" key).
+pub fn reset() {
+    let mut q = QUEUE.lock().unwrap();
+    q.jobs.push_back(Job::Reset);
     WAKE.notify_one();
 }
 
@@ -125,6 +139,29 @@ impl Worker {
         *BACKEND_NAME.lock().unwrap() = name;
     }
 
+    unsafe fn is_tts_engine(&self) -> bool {
+        !self.backend.is_null() && (self.api.features)(self.backend) & FEATURE_SUPPORTS_BRAILLE == 0
+    }
+
+    /// Switches to the best backend when it is not the one in use (e.g. NVDA started again).
+    unsafe fn recheck(&mut self) {
+        let best = (self.api.create_best)(self.ctx);
+        if best.is_null() {
+            return;
+        }
+        let name = |b: *mut c_void| CStr::from_ptr((self.api.backend_name)(b)).to_string_lossy().into_owned();
+        if self.backend.is_null() || name(best) != name(self.backend) {
+            crate::log::info(&format!("speech backend switched to {}", name(best)));
+            if !self.backend.is_null() {
+                (self.api.backend_free)(self.backend);
+            }
+            *BACKEND_NAME.lock().unwrap() = name(best);
+            self.backend = best;
+        } else {
+            (self.api.backend_free)(best);
+        }
+    }
+
     unsafe fn output(&mut self, text: &CString, interrupt: bool) -> i32 {
         if self.backend.is_null() {
             return -1;
@@ -170,15 +207,28 @@ pub fn start(dir: &Path) {
             }
             let mut w = Worker { api, ctx, backend: std::ptr::null_mut(), last_retry: None };
             w.create_backend();
+            let mut last_check = Instant::now();
             loop {
                 let job = {
                     let mut q = QUEUE.lock().unwrap();
                     while q.jobs.is_empty() {
-                        q = WAKE.wait(q).unwrap();
+                        let (guard, _) = WAKE.wait_timeout(q, RECHECK_INTERVAL).unwrap();
+                        q = guard;
+                        if q.jobs.is_empty() && last_check.elapsed() >= RECHECK_INTERVAL {
+                            break;
+                        }
                     }
-                    q.jobs.pop_front().unwrap()
+                    q.jobs.pop_front()
+                };
+                let Some(job) = job else {
+                    last_check = Instant::now();
+                    if w.is_tts_engine() {
+                        w.recheck();
+                    }
+                    continue;
                 };
                 match job {
+                    Job::Reset => w.recheck(),
                     Job::Say { text, interrupt } => w.say(&text, interrupt),
                     Job::Stop => {
                         if !w.backend.is_null() {

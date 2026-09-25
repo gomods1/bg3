@@ -3,6 +3,7 @@
 -- turns the write into a pipe message (no disk I/O). Without the bridge the file lands on disk and
 -- nothing is spoken, so Bridge.Check() reports it.
 local Log = Ext.Require("Core/Log.lua")
+local Strings = Ext.Require("Core/Strings.lua")
 
 local Bridge = {}
 
@@ -44,8 +45,7 @@ function Bridge.Check(onResult)
             Ext.Timer.WaitForRealtime(100, poll)
         else
             Bridge.Ok = false
-            Log.Error("BG3 Access native bridge did not answer. Speech will not work. "
-                .. "Check bin\\version.dll and bin\\BG3Access\\ (install.ps1 self-test).")
+            Log.Error(Strings.Get("bridge_missing"))
             if onResult then onResult(false, status) end
         end
     end

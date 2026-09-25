@@ -8,6 +8,7 @@ mod log;
 mod mouse;
 mod paths;
 mod speech;
+mod watchdog;
 
 use std::ffi::c_void;
 use windows_sys::Win32::Foundation::HMODULE;
@@ -37,6 +38,7 @@ unsafe extern "system" fn init(_: *mut c_void) -> u32 {
         Err(e) => log::info(&format!("channel hook FAILED: {e}")),
     }
     write_status("ready");
+    watchdog::start();
     0
 }
 
