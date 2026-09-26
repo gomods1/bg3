@@ -76,6 +76,9 @@ BG3Access.Journal = Ext.Require("Game/Journal.lua")
 BG3Access.Map = Ext.Require("Game/Map.lua")
 BG3Access.Player = Ext.Require("Game/Player.lua")
 BG3Access.Tutorial = Ext.Require("Game/Tutorial.lua")
+BG3Access.Preview = Ext.Require("Game/Preview.lua")
+BG3Access.Loca = Ext.Require("Game/Loca.lua")
+BG3Access.CombatLog = Ext.Require("Game/CombatLog.lua")
 BG3Access.TutorialHints = Ext.Require("Screens/TutorialHints.lua")
 
 if BG3Access.Debug then

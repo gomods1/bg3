@@ -4,7 +4,73 @@ Read this first, then `PLAYTEST.md` (what was exercised with which character and
 not, and which assumptions may break elsewhere) and `KEYS.md` (every shortcut, mod and game,
 confirmed or not).
 
-## Current state (session 6, 2026-09-25)
+**Next session starts with "Next session: start here" below (jumping on routes first; user,
+2026-09-25).**
+
+## Current state (session 7, 2026-09-25)
+
+Latest save: `96_village_sw_teahouse_gap` (the party fully rested at the Blighted Village's
+south-west edge; the quest reward window, "Mensajes en pantalla" and many combat fixes are in; the
+teahouse is not reachable by any route found). Earlier in the session:
+Where the test game was mid-session: act 1, the "Templo profanado" under the Shattered Sanctum: Priestess
+Gut is dead (killed by Tav alone in her chapel, looted), Tav escaped through her quarters;
+Shadowheart and Gale are up in the Sanctum by the hanging cage; the goblin camp is not hostile
+in this branch. Left: Dror Ragzlin, Minthara, the prisoner Liam. Saves: `67_session7_start`
+(Blighted Village path, from 63) ... `73_worg_pens_won`, `74_halsin_talked`, `75_camp_rested`,
+`76_minthara_talked`, `77_torture_room_won`, `78_gut_chapel`, `79/80` (branch: Tav dies later),
+`81_gut_chapel_rested`, `82_gut_setup`, `83_gut_killed_rested`, `84_gut_escaped`,
+`85_rested_before_halsin`, `86_chapel_door_fight`, `87_temple_retreat` (latest: the party in the
+Templo profanado after retreating, nearly dead).
+Session 7 so far:
+- **The "resources" message** the user asked about: "No tienes suficientes recursos: Acción" is
+  the game's cursor label for the main-hand attack it previews while the cursor rests on an enemy
+  in combat (no dialog; nothing to dismiss; Escape opened the game menu instead). The mod's
+  targeting left the cursor on its last target, so the label stuck and the HUD even took the
+  hover for an armed attack (it opened targeting by itself after spells). Fixed: the cursor is
+  parked on the minimap before any armed action is followed (Activate.Park; verified: label gone,
+  a real attack still confirmed and killed Sarnoso); the mod's preview reads the label with its
+  "[1]" filled ("No tienes suficientes recursos: Acción", from the shown text).
+- Combat start/end is no longer said around the game menu, the map and other HUD-hiding screens.
+- Items: Ctrl+D on inventory, equipment, loot and trade items gives the weapon's damage dice and
+  type, versatile dice, properties, weapon class and whether the character is proficient, the
+  weapon actions it unlocks, armour class, enchantment, weight (Game/ItemStats). The character
+  panel names whose it is and follows [ ] / F1-F4 to another party member. The empty light
+  source slot (no name in the game) is left out. Item moved to Gale ("Enviar a"), learning a
+  scroll read ("Aprender conjuro (Necesitas 50 de oro...), no disponible").
+- Barks: the same line is not repeated within 5 minutes (Volo's song looped every minute).
+- Passages: a use that moved nobody falls back to the thing's menu "Usar" (the worg pens'
+  entrance: the plain click got "No puedes llegar", the menu's Usar went round and in).
+- Dev: `source tools/mod.sh` (modcmd, modsel, modlist), `press rbracket`.
+- **The worg pens fight won by keyboard** (6 rounds, 8 enemies, Halsin allied; details in
+  PLAYTEST session 7), then Halsin's talk, a long rest with Withers and the Dream Visitor.
+  Fixed on the way: damage to things named right, the game's refusal reason on a failed confirm,
+  a spoken notice while the camera turns to aim, equipping in combat confirmed first (it spends
+  the action), an opportunity-attack warning before walking to a thing in combat, context menu
+  actions confirmed ("Hecho: Enviar a: Gale"), area banners not repeated.
+- Open: Magic Missile at 4 darts on two far goblins fired 2 (blocked?); aiming at targets on
+  ledges is slow (hover points, camera turn, tactical view: up to 16 s).
+- Then Minthara's talk, the torture room fight (won), Priestess Gut killed twice (the first
+  branch lost Tav to the goblins outside her door; the second escaped through her quarters).
+  Fixed on the way: the picking check (darts went to the enemy behind the chosen one), a door
+  clicked shut after opening, markers' double arrival, a new armed action not followed, cancels
+  checked, a close target looked at from the side, actions' availability read live, items that
+  grant spells and passives described. Two fights at once work (each follows the selected
+  character).
+- Then (saves 85-87): an 8-enemy fight at Gut's door, lost and retreated from; fixed on the way:
+  hover searches no longer overlap (wrong target, minute-long previews), confirms aim first,
+  Escape over a reaction declines it, the hotbar's "cannot act" messages are spoken ("No se
+  puede controlar: derribado"), trips open a shut door on the only way. Party in the Templo
+  profanado at 4/1/5 HP, supplies nearly out.
+- Then (saves 88-91): partial rests, food bought from Grat with the loot (supplies now said per
+  item), the party regrouped, down the "Raíces nudosas" (ladder climbs down fixed: step back,
+  tactical camera), Scratch befriended. Latest: `91_scratch_befriended` in the forest below the
+  Blighted Village; Auntie Ethel 119 m away with no route (jumps on routes still missing).
+- Then (saves 92-93): the grove reached by exploring north from the Roadside Cliffs (its gate
+  opens as the party comes), Auntie Ethel met (she was in the grove), Arabella's quest completed.
+  Latest: `93_arabella_done` in the Emerald Grove. Left in act 1: Dror Ragzlin and Minthara (the
+  Sanctum is partly hostile after Gut), Auntie Ethel's house, the refugees' quest.
+
+## State at the start of session 7 (session 6, 2026-09-25)
 
 Where the test game is: act 1, Blighted Village, on the forest path below the ogres' platform
 (Tav, Shadowheart, Gale, level 3; the ogres friendly after an Intimidation check). Latest saves:
@@ -211,7 +277,41 @@ In game
 - Localization: no second language table yet, the game language is not detected (M8).
 - Installer, README, uninstall.
 
-## Next steps (in order)
+## Next session: start here (user, 2026-09-25)
+
+The user asked to begin the next session with these open items, jumping first. Test game: save
+`96_village_sw_teahouse_gap` (party rested at the Blighted Village's south-west edge).
+
+1. **Jumps on routes.** Trips cannot reach places a player gets to by jumping (or by ways the
+   pathfinder does not plan): Auntie Ethel's teahouse ("Tetería" objective) had no route from
+   the Blighted Village, the Roadside Cliffs or the forest below the village (PLAYTEST session 7).
+   What is known (CLAUDE.md "Exploration facts"): routes can be planned from any point by
+   setting the path's `SourceAdjusted`/`SourceOriginal`, so a jump search is possible: points
+   reachable from the character, landings within the character's jump distance from which the
+   target is reachable, then walk there and use the character's own Jump (the Place cursor, as
+   verified for Jump in combat). First find out how a sighted player reaches the teahouse (a
+   path, a jump, a region that connects only once loaded), then build it and retest that trip.
+2. **Slow aiming** at targets on ledges (10-16 s: body heights, box points, camera turn, tactical
+   view in turn). Now announced ("Girando la cámara...") but should be faster (e.g. try the
+   tactical view earlier, fewer points per view).
+3. **Combat movement and use**: a Move toward something could end farther than its preview
+   said; walk-and-use with one click when the preview allows (built, not heard); the
+   opportunity-attack warning before a use (built, not heard); moves warn of dangerous
+   surfaces (built, not heard).
+4. **Stacks in trade**: a stack (Provisiones x3, 300 gold) can only be bought whole; find how the
+   game buys part of a stack (split dialog / barter) and offer it.
+5. **Unhandled or generic screens**: the tadpole powers screen (TadpolePowersTree, opened by
+   itself once during end-turn presses: find out why); message boxes now titled "Mensaje";
+   optional quest reward choices (built, not met).
+6. **Still to hear in play** (PLAYTEST session 7 "Not yet heard"): the passage fallback (menu
+   "Usar" when a passage click moves nobody), the "Has usado: <item>" fill, the talk-click retry.
+7. Game questions seen, not explained: Magic Missile at 4 darts on two far goblins fired 2;
+   Arcane Recovery unavailable after a short rest; Tav's ranged attack once unavailable.
+8. Campaign: act 1 left: Dror Ragzlin and Minthara (the Sanctum is partly hostile after Gut; a
+   fight at her door was lost), Auntie Ethel's house, the refugees' quest; level 4 at 1800 XP
+   (Tav 796) brings feats and ability improvements, not built yet (M6).
+
+## Older backlog (sessions 4-5)
 
 0. **The world map, accessibly (user, 2026-09-24).** (Progress: the Explore command walks in a
    compass direction; the chapel -> grove gate trip now works by player means with it. Left: the

@@ -14,6 +14,7 @@ local Highlights = Ext.Require("Game/Highlights.lua")
 local Entities = Ext.Require("Game/Entities.lua")
 local Camera = Ext.Require("Game/Camera.lua")
 local Picking = Ext.Require("Game/Picking.lua")
+local Hotbar = Ext.Require("Game/Hotbar.lua")
 local Bridge = Ext.Require("Core/Bridge.lua")
 local Config = Ext.Require("Core/Config.lua")
 local Timer = Ext.Require("Core/Timer.lua")
@@ -348,8 +349,15 @@ end
 
 local QUICK_TRIES = 2 -- checks per box point (they are many)
 
+-- Only the latest Hover moves the cursor: an earlier one still searching stops silently (its
+-- onDone is never called). Two searches at once fought over the cursor in targeting: the
+-- preview took a minute and Sacred Flame went to the target passed on the way (Roah instead of
+-- Azak, 2026-09-25).
+local hoverGen = 0
 function Activate.Hover(uuid, onDone, heights)
     onDone = onDone or function() end
+    hoverGen = hoverGen + 1
+    local gen = hoverGen
     local points = aimPoints(uuid, heights or AIM_HEIGHTS)
     if not points then
         onDone(false, "reason_gone")
@@ -357,6 +365,7 @@ function Activate.Hover(uuid, onDone, heights)
     end
     local i, anyOnScreen = 0, false
     local function try()
+        if gen ~= hoverGen then return end
         i = i + 1
         local point = points[i]
         if not point then
@@ -372,6 +381,7 @@ function Activate.Hover(uuid, onDone, heights)
         Bridge.Send(string.format("mouse move %.4f %.4f", fx, fy))
         local checks, tries = 0, point.quick and QUICK_TRIES or WORLD_TRIES
         local function check()
+            if gen ~= hoverGen then return end
             checks = checks + 1
             if Activate.IsHovering(uuid) then
                 lastHover = { uuid = uuid, fx = fx, fy = fy }
@@ -407,6 +417,37 @@ function Activate.ContextClick(uuid, onDone)
         Bridge.Send("mouse click right")
         onDone(true, nil, at.fx, at.fy)
     end)
+end
+
+-- Moves the cursor off the world, onto the minimap. With nothing armed, the cursor resting on an
+-- enemy in combat makes the game preview the main-hand attack: UIData.ActiveSlot is set as for an
+-- armed action and the cursor text says why it cannot be used ("No tienes suficientes recursos:
+-- Acción" after the action was spent), until the cursor leaves (verified 2026-09-25, worg pens;
+-- Escape then opened the game menu, and the hotbar's CancelTaskCommand / ActionCancelCommand
+-- changed nothing). The minimap is anchored top right: its centre measured 351 x 311 UI units
+-- from that corner (2560x1600); IsMouseOver confirms it. onDone(ok) after the hover settled.
+local PARK_FROM_RIGHT, PARK_FROM_TOP = 351, 311
+local CLICK_LANDS_MS = 600
+function Activate.Park(onDone)
+    onDone = onDone or function() end
+    local scale, w, h = Ui.Scale()
+    if not (w > 0 and h > 0) then
+        onDone(false)
+        return
+    end
+    local fx, fy = 1 - PARK_FROM_RIGHT * scale / w, PARK_FROM_TOP * scale / h
+    local function move()
+        Bridge.Send(string.format("mouse move %.4f %.4f", fx, fy))
+        lastHover = nil
+        Timer.After(3 * HOVER_WAIT_MS, function()
+            local under = Ui.WidgetUnderPointer()
+            trace("cursor parked at %.4f %.4f over %s", fx, fy, tostring(under))
+            onDone(under ~= nil)
+        end)
+    end
+    -- A click just sent lands ~220 ms later where the cursor is then.
+    local wait = Bridge.LastClickAt + CLICK_LANDS_MS - Ext.Timer.MonotonicTime()
+    if wait > 0 then Timer.After(wait, move) else move() end
 end
 
 -- true while the cursor is over entity uuid and not over the UI.
@@ -639,6 +680,21 @@ end
 -- "ESCAPE"). Injected keys do not pass through the mod's KeyInput handler.
 function Activate.Key(scancode)
     Ext.Input.InjectKeyPress(scancode)
+end
+
+-- Cancels the armed action with the game's cancel key, checked: one Escape left Scorching Ray and
+-- a Reckless Attack armed (worg pens and torture room, 2026-09-25), so a second one is sent when
+-- the action is still armed CANCEL_CHECK_MS later (never with nothing armed: that Escape would
+-- open the game menu).
+local CANCEL_CHECK_MS = 600
+function Activate.CancelArmed()
+    Activate.Key("ESCAPE")
+    Timer.After(CANCEL_CHECK_MS, function()
+        if Hotbar.Armed() then
+            trace("armed action still armed after Escape: cancelling again")
+            Activate.Key("ESCAPE")
+        end
+    end)
 end
 
 return Activate

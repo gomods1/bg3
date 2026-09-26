@@ -12,12 +12,16 @@ local STATUS_PATH = "BG3Access/bridge_status.txt"
 
 Bridge.Version = "0.1.0"
 Bridge.Ok = nil -- nil = unknown, true/false after Check
+-- When the last "mouse click" was sent (MonotonicTime ms): the bridge presses the button ~220 ms
+-- later at wherever the cursor is then, so nothing may move the cursor away before that.
+Bridge.LastClickAt = 0
 
 function Bridge.Escape(text)
     return (tostring(text):gsub("\\", "\\\\"):gsub("\r?\n", "\\n"))
 end
 
 function Bridge.Send(line)
+    if line:sub(1, 11) == "mouse click" then Bridge.LastClickAt = Ext.Timer.MonotonicTime() end
     local ok = Ext.IO.SaveFile(CHANNEL_PATH, line .. "\n")
     if not ok then Log.Error("bridge write failed: " .. line) end
     return ok

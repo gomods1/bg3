@@ -61,6 +61,11 @@ the player set are kept.
 The game binds Ctrl only on C, V, X, Y, Z (text editing), so the mod uses Ctrl + other letters.
 Do not bind Insert or Caps Lock (NVDA modifiers).
 
+Mod menu command added in session 7: "Mensajes en pantalla" (what the game shows on screen right
+now outside windows: the cursor's lines, "No se puede controlar: ...", the banner, side tutorials;
+none of them needs dismissing). The quest reward window is a list: Enter on Aceptar takes the
+reward (it waits until then).
+
 ## 2. Mod keys inside screens and lists
 
 These are claimed only while the screen or list is in front; elsewhere they stay the game's.
@@ -144,6 +149,10 @@ Confirmed means pressed with the mod running and the effect checked.
 | I | Inventory (character panel; the mod reads it as sections) | confirmed |
 | Q / E | Rotate the camera (the mod also uses them to turn the camera for travel and targeting) | confirmed (injected) |
 | Left Alt | Show world highlights (the mod uses it for the Nearby list) | confirmed (injected) |
+| [ ] | Previous / next character; with the character panel open it switches to that character's inventory, equipment and sheet ("Personaje: Gale. Inventario. 6 botones.") | confirmed (session 7) |
+| Space (combat, twice within 8 s) | End turn when an action or bonus action is left (the mod says what is left first); the party ends one character at a time | confirmed |
+| Escape (reaction popup) | The mod: "No reaccionar" (the game's Escape there opened the game menu) | built, not yet pressed in play (session 7) |
+| Escape (combat, nothing armed) | Opens the game menu. The "No tienes suficientes recursos" cursor label is not a dialog: the mod clears it by moving the cursor off the enemy | confirmed (session 7) |
 
 ## 4. Game keys not yet confirmed with the mod
 
@@ -155,7 +164,6 @@ the mod does not claim them outside its own screens, but not exercised yet:
 | Space (outside combat) | skip dialogue line, take all (loot) |
 | Shift+Space | enter / leave turn-based mode, flee |
 | Tab | party / character view |
-| [ ] | previous / next character |
 | I, J, K, N, H, B, L | inventory, journal, spells, character, alchemy, tadpole powers, reactions |
 | C, Shift+C, G | sneak, group stealth, group mode |
 | Z, X, V, F, R | jump, throw, shove, switch weapon set, dual wielding (an action the game arms by its own key, X or a hotbar number included, is followed by the mod's targeting list after 0.7 s: X lists what can be thrown, then where; confirmed for X and V "Objetivo para Empujar"; the hotbar numbers had no slots bound in this save) |

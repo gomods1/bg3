@@ -7,6 +7,7 @@
 -- Area: CurrentPlayer.SelectedCharacter.PlayerCharacterProperties.CurrentSubregionName (handle,
 -- "Playa arrasada"; unknown handle where there is no subregion, e.g. the nautiloid).
 local Vm = Ext.Require("Game/Vm.lua")
+local Ui = Ext.Require("Game/Ui.lua")
 local Player = Ext.Require("Game/Player.lua")
 local Text = Ext.Require("Core/Text.lua")
 local Loca = Ext.Require("Game/Loca.lua")
@@ -14,15 +15,42 @@ local Tutorial = Ext.Require("Game/Tutorial.lua")
 
 local Notification = {}
 
--- Fills "[n]" with the n-th parameter's text (as in the combat log).
+-- The banner's text as shown (run-built TextBlocks under NotificationWidget) that starts with
+-- prefix, or nil.
+local function shownStartingWith(prefix)
+    local root = Ui.FindByName(Ext.UI.GetRoot(), "ContentRoot")
+    local widget = root and Ui.FindByName(root, "NotificationWidget")
+    local found = nil
+    local function walk(el, depth)
+        if found or not el or depth > 60 then return end
+        if tostring(el.Type) == "TextBlock" then
+            local t = Ui.InlineText(el)
+            if t and t:sub(1, #prefix) == prefix and #t > #prefix + 1 then found = t return end
+        end
+        for _, k in ipairs(Ui.Kids(el)) do walk(k, depth + 1) end
+    end
+    walk(widget, 0)
+    return found
+end
+
+-- Fills "[n]" with the n-th parameter's text (as in the combat log). A parameter without text
+-- ("Has usado: ." for a key that opened a door, 2026-09-25) is taken from the banner as shown.
 local function render(ctx)
     local template = tostring(Vm.Get(ctx, "Text") or "")
     if template == "" then return nil end
     local params = Vm.List(ctx, "Params")
+    local missing = false
     local s = template:gsub("%[(%d+)%]", function(n)
         local p = params[tonumber(n)]
-        return p and tostring(Vm.Get(p, "Text") or "") or ""
+        local t = p and tostring(Vm.Get(p, "Text") or "") or ""
+        if t == "" then missing = true end
+        return t
     end)
+    if missing then
+        local prefix = Text.Clean((template:match("^(.-)%[%d+%]") or ""))
+        local shown = prefix ~= "" and shownStartingWith(prefix)
+        if shown then return shown end
+    end
     return Text.Clean(s)
 end
 

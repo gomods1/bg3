@@ -10,6 +10,7 @@
 --   equips equipment, uses consumables); unequipping: UnequipItemCommand(slot VM)
 --   (CharacterSheetTemplates_k.xaml).
 local Vm = Ext.Require("Game/Vm.lua")
+local Strings = Ext.Require("Core/Strings.lua")
 local Loca = Ext.Require("Game/Loca.lua")
 local Player = Ext.Require("Game/Player.lua")
 local Items = Ext.Require("Game/Items.lua")
@@ -56,11 +57,14 @@ function Inventory.Equipment()
     local out = {}
     for _, name in ipairs(SLOTS) do
         local slot = Vm.Get(eq, name)
-        if slot then
+        local item = slot and Items.Read(Vm.Get(slot, "Item"))
+        -- The game's panel has no light source slot (no name for it in its templates): listed only
+        -- when something is in it.
+        if slot and (item or name ~= "LightSource") then
             out[#out + 1] = {
                 slotType = name,
-                label = Loca.Enum("SelectedEquipmentSlotTextBlockStyle", name) or name,
-                item = Items.Read(Vm.Get(slot, "Item")),
+                label = Loca.Enum("SelectedEquipmentSlotTextBlockStyle", name) or (name == "LightSource" and Strings.Get("slot_light_source")) or name,
+                item = item,
             }
         end
     end

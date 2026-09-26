@@ -279,6 +279,34 @@ Note: printing these logs through Python in Git Bash needs `sys.stdout.reconfigu
   (`MovementResourceCostPreview`); a verified ground click walks there and spends it (verified).
 - The controlled character is `CurrentPlayer.SelectedCharacter` (the `ClientControl` component
   stays on the first party member).
+- **The cursor resting on an enemy is a hover, not an armed action** (verified 2026-09-25, worg
+  pens): with nothing armed, in combat, the game previews the main-hand attack on the hovered
+  enemy: `UIData.ActiveSlot` is set exactly as for an armed action (the hotbar frames the slot),
+  and when it cannot be used the cursor text says why ("No tienes suficientes recursos: Acción").
+  That label is what players saw "stuck" on screen: it stays until the cursor leaves the enemy.
+  Escape then opens the game menu; the hotbar DC's `CancelTaskCommand` / `ActionCancelCommand`
+  change nothing. Moving the cursor off the world clears it: the mod parks it on the minimap
+  (Activate.Park: 351 x 311 UI units from the top right corner, checked with IsMouseOver), and
+  the HUD parks before following any armed action, so only an action still armed afterwards
+  counts as the player's.
+- Cursor text (`CursorText` widget, `CursorTextList` > "txt" TextBlocks, one per
+  `ActiveTask.Info` entry): the Info handle keeps its "[1]"; only the shown text is filled
+  (read with Ui.InlineText).
+- **Picking**: `GameObject` of the picking helper is what a click acts on; its `Character` /
+  `Item` fields can name someone else (the cursor "on" Camorrista Gurd sent Magic Missile's darts
+  to Zami Ojo Avizor on a ledge behind him). Picking.IsHovered trusts GameObject when present.
+- **Several fights at once** (verified 2026-09-25, the Sanctum): the game said "Varios encuentros
+  de combate"; Tav fought Gut's goblins while Shadowheart and Gale fought three others. The turn
+  order bar and the tracker follow the selected character's fight ("Combate: 5 enemigos" on F1).
+- Hotbar `CanUse` is false for every slot while an animation plays (Rage): read it when the
+  player acts, not when a list is built.
+- Combat log damage templates: "[2] ha recibido un impacto de [3]", "[1] ha impactado a [2] e
+  inflige [3]" (a thrown weapon is [1]); the damaged one is the reference just before the
+  Damage-typed parameter. Multi-hit spells log identical lines that are real (two rays of 6).
+- Equipping in combat costs the action; Acciones > "Equipar (Tav)" works on a weapon on the floor.
+- The game menu, the map and other screens hide the whole HUD, the turn order bar
+  (CombatantsOverlay) included, in the middle of a fight: the combat tracker waits while the
+  hotbar is hidden (it said "Fin del combate" / "Combate" around every game menu).
 
 ## Exploration facts (verified 2026-09-24, session 3)
 
@@ -374,6 +402,13 @@ Note: printing these logs through Python in Git Bash needs `sys.stdout.reconfigu
   e.g. Tav: «Oeste: Puerta de Baldur. Este: Elturel» (Risen Road, verified 2026-09-24).
 - Dirt mounds ("Montón de tierra"): a click without a shovel: "No quiero ensuciarme las manos.
   Necesito una pala." (Survival checks roll on approach).
+- **Routes from any point** (verified 2026-09-25): `Ext.Level.BeginPathfindingImmediate(entity, to)`
+  then `path.SourceAdjusted = p; path.SourceOriginal = p` before FindPath plans from p (a route
+  from (179,19,538) to Auntie Ethel's marker was found that way). WorldClimbType/WorldDropType
+  (defaults 1/1) and WorldClimbingHeight (2.1) up to 15 found no way where none existed. Base for
+  a jump search (a point reachable from the character, a landing within jump range from which the
+  target is reachable). Ethel's marker from the forest below the Blighted Village: the nearest
+  sampled points of the two sides lie 72 m apart (no jump); many samples belong to neither side.
 - The engine's pathfinder plans ladders and teleport portals, not free jumps (no non-ladder
   portal on any route within 70 m of El Hueco): a gap it cannot route is "no way found".
 
@@ -478,6 +513,51 @@ Note: printing these logs through Python in Git Bash needs `sys.stdout.reconfigu
 - A marker's entity can be unloaded on the client until the party is close (Arron 55 m away):
   Travel.Interact walks to the marker's position and waits for it to load.
 
+## Items (verified 2026-09-25, goblin camp)
+
+- An item's stats: the item entity's `Data.StatsId` (WPN_Greataxe, ARM_Leather) then
+  `Ext.Stats.Get`: Damage "1d12", "Damage Type", VersatileDamage, "Weapon Properties"
+  {Twohanded, Melee, Heavy, Dippable}, "Proficiency Group" {Greataxes, MartialWeapons},
+  BoostsOnEquipMainHand "UnlockSpell(...)" (the weapon actions), DefaultBoosts
+  (WeaponEnchantment(n)), PassivesOnEquip; armour: ArmorClass, ArmorType, Shield. Names in the
+  game's language from the tooltip templates (Game/EnumNames: DamageTypeNameTemplate,
+  Tooltips.TypeId, EquipmentProficiencyNameStyle). The item VM has Stats.Weight.Value (kg) and
+  Stats.Range.Value. A character's proficiencies: entity `Proficiency.Flags`.
+- The character panel follows the selected character: the game's `[` `]` (scancodes 0x1A/0x1B,
+  US positions) and F1-F4 switch with the panel open.
+- The equipment's LightSource slot has no name in any game template (the panel does not show it).
+- A wizard learns a scroll from its context menu: "Aprender conjuro (Necesitas 50 de oro para
+  aprenderlo)", disabled without the gold. "Enviar a > Gale" moves an item to Gale at once.
+- Passages (items with `ItemPortal`: the Sanctum's "Puertas pesadas de roble", "Entrada al cubil
+  de huargos") move the party when used. A plain left click on one can be lost (the Sanctum
+  doors after a walk) or refused with "No puedes llegar" (the worg pens' entrance from inside the
+  Sanctum), while the thing's context menu "Usar (Tav)" makes the game walk its own way round
+  (120 m) and go in. The mod checks that a used passage moved the party and falls back to the
+  menu's first entry (ContextMenu.UseFirst).
+- Doors on a trip: an **open** door's leaf can stand on the ground the next click aims at; the
+  trip took it for a closed door and clicked it shut. Doors are now clicked only when the server
+  says they are closed.
+- A target 2 m in front of the character is hidden by its body both from the usual view and from
+  a view turned toward it: Travel.Interact looks from the side for targets under 3 m.
+- Priestess Gut (story, verified): "Sí. Adelante" twice; she wants no onlookers (companions
+  within ~12 m of her chapel keep the ritual from starting; 30-40 m away works; unchain them with
+  G first or the leader drags them along); at the ritual she locks her chapel door, "Atacar"
+  starts a fight in which she calls for help: the goblins outside cannot enter but hit through
+  it with spells and arrows (Tav, left idle, died). Her key opens "Entrada a los aposentos de la
+  sacerdotisa", a passage down to the "Templo profanado" that ends the fight.
+
+## Party split and regroup (verified 2026-09-25)
+
+- With the party split into groups (the game's G), fast travel and "Abandonar el campamento" move
+  only the leader's group; leaving camp puts each character back where it was before camp.
+  A long rest (even a partial one) gathers everyone in camp; G there joins the groups (it says
+  "¡El grupo objetivo está demasiado lejos!" when the others are far); a fast travel by the
+  joined party then takes everyone.
+- Camp supplies: item VM `CampSupplies` per unit (Provisiones 40, Sandía and Filete crudo 10,
+  Pescado 4, Uvas 2); a full long rest needs 40; food selected on the rest screen is used even
+  when it cannot reach 40 (Enter on a selected food deselects it). Trade prices of stacks are
+  for the whole stack (Provisiones x3: 300).
+
 ## Dialogue facts (verified 2026-09-24, Shadowheart's pod)
 
 - Answer tags: `Name`/`Category` handles ("Bárbaro"/"Clase"), `IsRoll` for checks ("Fuerza").
@@ -514,6 +594,10 @@ HUD opens the game menu), `lua-server <code>`, `save <name> "<note>"` (quick-sav
 every risky test and at every new place/branch (user rule, 2026-09-24)** so bugged branches can be
 retested. Dev deploy: `python tools/deploy.py` (all) or `--lua`; hot reload:
 `deploy.sync_loose()` then `lua 'Ext.Debug.Reset()'`.
+`press` also takes US-position keys as raw scancodes: `lbracket`, `rbracket`, `backtick`...
+Lua `print` output does not come back: `return` a string. `source tools/mod.sh` gives
+`modcmd <id>` (run a mod command), `modsel <text>` (cursor to the entry containing text) and
+`modlist` (the open list as spoken).
 
 ## Player installer (verified 2026-09-24, session 5)
 

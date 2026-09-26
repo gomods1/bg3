@@ -61,7 +61,8 @@ function Camp.Read()
     for _, slot in ipairs(Vm.List(Vm.Get(d, "PartyCampSupplies"), "Slots")) do
         local item = Items.Read(Vm.Get(slot, "Object"))
         if item then
-            out.supplies[#out.supplies + 1] = { name = item.name, count = item.count, selected = Vm.Get(slot, "SelectedAmount") or 0 }
+            out.supplies[#out.supplies + 1] = { name = item.name, count = item.count, selected = Vm.Get(slot, "SelectedAmount") or 0,
+                perUnit = item.campSupplies }
         end
     end
     return out

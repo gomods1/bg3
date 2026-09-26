@@ -10,10 +10,22 @@
 -- With nothing armed, hovering the ground in combat previews the walk there (Cost, ValueAfterUse,
 -- CanExecute; verified 2026-09-24).
 -- These are previews: they must never be announced as events (gate.md 9, PreviewGuard).
+local Ui = Ext.Require("Game/Ui.lua")
 local Vm = Ext.Require("Game/Vm.lua")
 local Player = Ext.Require("Game/Player.lua")
 
 local Preview = {}
+
+-- The cursor lines as the game shows them (CursorText.xaml: CursorTextList, one TextBlock "txt"
+-- per ActiveTask.Info entry, in order; text built from runs). The Info handle keeps its "[1]"
+-- ("No tienes suficientes recursos: [1]"): the game fills it only in the shown text ("...:
+-- Acción", verified 2026-09-25). Entries are false where nothing reads.
+local function shownCursorLines()
+    local list = Ui.FindElement("CursorText", "CursorTextList")
+    local out = {}
+    for _, el in ipairs(list and Ui.FindAllByName(list, "txt") or {}) do out[#out + 1] = Ui.InlineText(el) or false end
+    return out
+end
 
 -- { hitChance?, damageMin?, damageMax?, moveCost?, moveLeft?, canExecute, opportunityAttack,
 --   lethal, advantages = n, disadvantages = n, surface? (game text), messages = { game texts:
@@ -33,8 +45,13 @@ function Preview.Read()
         surface = Vm.Text(task, "SurfaceMessage"),
         messages = {},
     }
-    for _, info in ipairs(Vm.List(task, "Info")) do
+    local shown = nil
+    for i, info in ipairs(Vm.List(task, "Info")) do
         local text = Vm.Enum(info, "TextContext") ~= "HitChance" and Vm.Text(info, "Text")
+        if text and text:find("%[%d+%]") then
+            shown = shown or shownCursorLines()
+            text = shown[i] or text:gsub("%s*:?%s*%[%d+%]", "")
+        end
         if text then out.messages[#out.messages + 1] = text end
     end
     if Vm.Get(hit, "ShowDescription") == true then out.hitChance = Vm.Get(hit, "TotalHitChance") end

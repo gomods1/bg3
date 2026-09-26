@@ -43,6 +43,8 @@ end
 
 local function poll()
     local now = Ext.Timer.MonotonicTime()
+    -- A hidden HUD says nothing about the fight: wait until it shows again.
+    if not Combat.HudShown() then return end
     local id = Combat.Current()
     if id ~= state.combat then
         if id then

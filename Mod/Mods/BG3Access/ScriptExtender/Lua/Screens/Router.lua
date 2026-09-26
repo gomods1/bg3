@@ -28,6 +28,7 @@ local SCREENS = {
     Ext.Require("Screens/Camp.lua"),
     Ext.Require("Screens/LoadGame.lua"),
     Ext.Require("Screens/Trade.lua"),
+    Ext.Require("Screens/Reward.lua"),
     Ext.Require("Screens/Book.lua"),
     Ext.Require("Screens/Credits.lua"),
     Ext.Require("Screens/Examine.lua"),
@@ -129,6 +130,13 @@ function Router.InGame()
 end
 
 function Router.OpenModScreen(handler)
+    -- The screen it replaces is told (targeting then lets the HUD follow its armed action again:
+    -- a turn order list opened over a throw's targeting left the throw armed and unfollowed,
+    -- 2026-09-25).
+    local replaced = Router.handler
+    if replaced and replaced ~= handler and replaced.OnReplaced then
+        Log.Guard("replaced mod screen", function() replaced:OnReplaced() end)
+    end
     Router.handler = handler
     below = {}
     Log.Guard("open mod screen", function() handler:Open() end)

@@ -8,8 +8,9 @@ local Text = Ext.Require("Core/Text.lua")
 
 local Items = {}
 
--- { name, description, count, value, rarity, stolen, uuid, itemType, useType, equipped,
---   isEquipment, isNew } or nil.
+-- { name, description, count, value, weight? (kg, Stats.Weight.Value), campSupplies? (per unit),
+--   rarity, stolen, uuid,
+--   itemType, useType, equipped, isEquipment, isNew } or nil.
 function Items.Read(item)
     if not item then return nil end
     return {
@@ -17,6 +18,8 @@ function Items.Read(item)
         description = Vm.Text(item, "Description"),
         count = Vm.Get(item, "Count") or 1,
         value = Vm.Get(item, "Gold"),
+        weight = Vm.Get(Vm.Get(Vm.Get(item, "Stats"), "Weight"), "Value"),
+        campSupplies = Vm.Get(item, "CampSupplies"), -- per unit: Provisiones 40, Sandía 10, Pescado 4
         rarity = Vm.Enum(item, "Rarity"),
         stolen = Vm.Get(item, "IsStolen") == true,
         uuid = Vm.Get(item, "EntityUUID"),

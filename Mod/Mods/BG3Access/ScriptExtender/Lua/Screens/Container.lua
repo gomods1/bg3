@@ -40,7 +40,7 @@ function Container:Build()
             out[#out + 1] = Controls.Item({
                 kind = "button",
                 describe = function() return itemText(item) end,
-                details = function() return item.description end,
+                details = function() return ItemWords.Details(item) end,
                 -- The game's log says what was taken ("Tav: ha recogido 1 Olla"); the list is read
                 -- again without it.
                 activate = function()

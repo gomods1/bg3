@@ -55,6 +55,18 @@ function Reactions:Build()
     return out
 end
 
+-- Escape lets the moment pass: the game's own Escape over this popup opened the game menu
+-- (twice in the Sanctum, 2026-09-25) and left the question waiting.
+function Reactions:OnKey(combo)
+    if combo == "ESCAPE" then
+        local ok = Game.DontReact()
+        Speech.Say(ok and (Loca.Text(Game.DontReactLabel) or L("reaction_dont"))
+            or L("could_not_activate", { label = L("reaction_dont"), reason = L("reason_unavailable") }), { interrupt = true })
+        return true
+    end
+    return ListScreen.OnKey(self, combo)
+end
+
 function Reactions:Help()
     local lines = ListScreen.Help(self)
     lines[#lines + 1] = L("help_reaction")

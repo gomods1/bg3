@@ -361,6 +361,150 @@ Started in the first fight (game left running from session 2).
   `lua "for _,c in ipairs(BG3Access.Commands.Available()) do if c.id=='actions' then BG3Access.Commands.Run(c) end end"`
   (config v2 has no direct keys for them).
 
+### Session 7 (2026-09-25)
+Started with the game left running in the worg pens fight (test branch from save 66).
+- The "resources" cursor label (user report): reproduced on Tav with no action left, cursor on
+  Sarnoso: `ActiveSlot` set, cursor text "No tienes suficientes recursos: Acción"; a real Escape
+  opened the game menu; after the fix the HUD parked the cursor ("cursor parked at 0.8984 0.1440
+  over Minimap") and nothing was armed; the preview then read "No tienes suficientes recursos:
+  Acción" (was "[1]"). Next turn: actions list > main-hand attack > Sarnoso (65 %) > Enter: "Tav ha
+  matado a Sarnoso". Game menu opened and closed in combat: no "Fin del combate" any more.
+- Campaign from save 63 (Blighted Village path): markers list > "Campamento goblin" objective:
+  walked 164 m into the camp (Volo singing; "Lo más cerca que llegan los caminos"). Inventory
+  checks there (Tav, Shadowheart, Gale): weapon details (greataxe, handaxes, dagger, shortbow,
+  quarterstaff with its versatile die), armour class of the leather armour and Gale's robe,
+  proficiency, weapon actions; [ ] switched the panel to Shadowheart then Gale.
+- Farther list > "Puertas pesadas de roble" (63 m): the walk ended at the doors, the use click did
+  nothing (silence); Enter again from Nearby went in ("Zona: Santuario destrozado"). Markers >
+  "Salva a Arabella" ended 40 m short up a ladder (not reachable from there; not pursued).
+  Farther > "Entrada al cubil de huargos" (112 m): at the door the game said "No puedes llegar";
+  Acciones > "Usar (Tav)" walked Tav 120 m round and into the worg pens. Picked up a healing
+  potion and a scroll of Protection from Evil and Good (owned: "robar") from Nearby; the scroll
+  sent to Gale, whose menu reads "Aprender conjuro (Necesitas 50 de oro para aprenderlo), no
+  disponible" (party gold 4).
+- **Worg pens fight won by keyboard** (main line, saves 72 -> 73; Tav barbarian 3, Shadowheart
+  cleric 3, Gale wizard 3, Halsin as the cave bear allied): Zurk brushed us off ("Las manos
+  quietas"); a Reckless Attack on him (84 %, advantage) started "Te están deteniendo por
+  agresión" (4 answers read, 4 "Atacar"); 8 enemies. Round 1 Zurk disarmed Tav ("¡Desarmado!"):
+  Nearby > Hacha a dos manos > Enter walked and drew Zurk's opportunity attack without any
+  warning (fixed after: the hover preview's AoOWarning is asked first; not yet heard), a second
+  Enter could not aim; Acciones > "Equipar (Tav)" from the floor worked (it costs the action).
+  Rage in combat; Shadowheart's Guiding Bolt missed, Inflict Wounds killed Vrak, Shield of Faith
+  on Tav, Healing Word on herself at 2 HP; Gale's Magic Missile at level 2 (4 darts, 2 each on
+  the fleeing Tres and Uno) fired only 2 darts by the game's log (open question: blocked on the
+  way?), level 1 on Zurk (3 darts, same target) killed him; Scorching Ray 3 rays on Pulgoso (24
+  damage); Shield reaction offered and used ("necesita 11... Ha sacado 15"); Tav equipped his
+  shortbow from the inventory (it took the action: now confirmed first in combat) and shot the
+  archers; Halsin killed Plig, Eef, Neem and Nass; the last Magic Missile (1 dart Pulgoso, 2
+  Sarnoso) ended it: "Gale ha matado a Pulgoso ... Gale ha matado a Sarnoso ... Fin del combate".
+  6 rounds. Found and fixed during the fight: a damage line on a thing ("Rejilla de celda
+  ruidosa") was said as the attacker's ("Pulgoso: Mordisco, 4 de daño"); a confirm the game
+  refused said "the game did not react" while the preview said "¡Un obstáculo bloquea el paso!"
+  (now the game's reason); aiming at archers on ledges took up to 16 s in silence (now "Girando
+  la cámara para apuntar a ..."). The end-turn confirmation window is 8 s (the harness is slow:
+  `press space space`).
+- Halsin's conversation after the fight (7 answers with the class tag "Bárbaro:", the tadpole
+  lore, Moonrise; asked to stay), long rest from the mod menu (message box, camp, Withers
+  "Mustio quiere hablar" talked to, his tutorial read, supplies auto-selected, full rest), the
+  Dream Visitor's night scene (5 answer sets). Area banners: "Campamento" was said three times
+  (a late region banner and its Type None copy): fixed. Context menu actions now say what was
+  done ("Hecho: Enviar a: Gale. Armadura de cuero, valor 40.", verified).
+- Minthara (saves 76): the scene with Rozzak, narrator lines, the tadpole thoughts as answers
+  (in «»), agreed to question the prisoner; the journal then marked all three leaders.
+- Torture room (save 77): markers > the captive adventurer (Spike torturing Liam): "Dame tu
+  garrote. Minthara me ha ordenado" then "Atacar a los goblins": 2 enemies grew to 4 (Tozad and
+  Zurga "Temporalmente hostil"), won in 4 rounds: Scorching Ray (two identical hits were merged:
+  fixed), Guiding Bolt kill, a thrown handaxe (Acciones > Lanzar arma: "Hacha de mano: 9 de daño"
+  named the axe as the damaged: fixed), Magic Missile x3 on one target, Shield reaction, Healing
+  Word. A throw armed while an earlier attack stayed armed was not followed (fixed: the HUD
+  follows a different armed action; cancels are checked and repeated once).
+- Priestess Gut (saves 78-84): the brand refused, tadpole connection cut, "Haz lo que puedas";
+  she wanted no onlookers: Shadowheart and Gale walked 12 m (not enough), then 40 m; a door
+  on the way was opened then clicked shut again (fixed). Ritual > Atacar: Tav alone killed her
+  (40 HP, 4-5 reckless attacks) twice. First time: five goblins outside the locked door and the
+  companions in a second fight of their own ("Varios encuentros de combate": Inflict Wounds for
+  46, Sacred Flame, Magic Missile; the darts meant for Gurd hit Zami behind him: picking fixed);
+  Tav left idle behind the door was killed by spells and arrows through it (dying, death saves,
+  death all narrated). Reloaded (save 78), long rest, party unchained with G, the ritual again:
+  Gut killed, looted in combat (Acciones > Saquear), her key opened "Entrada a los aposentos de la
+  sacerdotisa" (Move toward, then use): "Fin del combate", Tav in the "Templo profanado" (save 84).
+  Also: Rage's animation left the actions list's Reckless Attack "unavailable" (now read live);
+  Gut 2 m ahead could not be clicked (side view now); "Llegada" said twice for markers (fixed);
+  item details now include what amulets and shields grant (talisman: "Otorga: Talismán de la
+  Absoluta: auxilio. Al equiparlo: Misericordia de la Absoluta: ..."); the stale note read as a book.
+- The Defiled Temple (save 84): Polma's "zona restringida" dialogue, an Intimidation check at
+  difficulty 22 ("Solo un 20 tiene éxito") failed 7 + 2 = 9, told to leave. Back up: a long rest
+  (supplies now nearly out), then a trip to the worg pens met Gut's locked chapel door: trips now
+  walk up to a shut door on the only way and click it ("Has usado: ." — the key's name is
+  missing in that notification). Behind it: 8 enemies (Roah Brillaluna, Erna, Yerle "Temporalmente
+  hostil", then "Testigo"; four goblins; Faerie Fire on the party). Found and fixed: a hover search
+  kept running after the focus moved on and fought the next one for the cursor (a preview took a
+  minute; Sacred Flame meant for Azak hit Roah): only the newest search runs, and a confirm aims
+  at the chosen target first (the portrait command acted on whoever the cursor was over); Escape
+  over the reaction popup opened the game menu (now "No reaccionar"); the hotbar's "No se puede
+  controlar: derribado" was never said (now every such message is announced). The party lost the
+  fight and retreated through Gut's passage one by one (Tav's Help raised Shadowheart from
+  dying; she, then Gale, then Tav went through; "Fin del combate" for each) to the temple (save 87).
+  Verified: the equip confirmation in combat ("Equipar en combate gasta tu acción. Intro otra vez
+  equipa Maza tosca.", nothing equipped). Seen, not fixed: combat moves walk through electrified
+  water and ice with no warning (trips check surfaces, the in-combat Move does not); a Move
+  toward something can end farther than its preview said; things are used in combat only
+  within 3 m (a 4 m passage needed a Move first); F2/F3 swap characters when one leaves the fight.
+- Supplies (saves 87-89): the long rest asked "No tienes suficientes suministros"; a partial rest
+  ("¿Acampar sin suministros?" Continuar); fast travel from camp to the Blighted Village left
+  Shadowheart and Gale behind ("Lejos de ti: Gale a 841 metros"); markers > Grat: first "Ningún
+  camino llega" (63 m short), then reached; trade with Grat: sold the mace, the shield, the
+  leather armour, the dagger, the wyvern toxin and the sleep potion ("Vendido ... Tu oro: 102"),
+  bought Sandía, Filete crudo, Pescado, Uvas moradas; item lines now say the camp supplies per
+  unit ("Provisiones, 3, 40 de suministros, 300 de oro"). Gap: a stack (Provisiones x3, 300) can
+  only be bought whole; the mod refused it as too expensive.
+- Regroup and the road south (saves 90-91): the party regrouped (see CLAUDE.md "Party split");
+  markers > Tita Ethel: "Ningún camino llega hasta allí" -> the nearest point; the walk down the
+  "Raíces nudosas" (a ladder of roots down a cliff) failed four times from the top: the walker's
+  own body covered every aim point, and my stricter picking check (GameObject) refused the rest.
+  Fixed: picking refuses only another creature as GameObject; a failed climb down steps back and
+  clicks the ladder at once, then tries the tactical camera; the roots were then climbed ("Zona:
+  Bosque"). Ethel is still 119 m beyond the reachable ground (no route: likely a jump; M4 "Jumps
+  on routes"). Scratch (Rasca): Animal Handling with Guidance added from the mod menu on the roll
+  screen ("Añadido: Guía. ... El dado tiene que sacar de 6 a 9 o más"; "Sacas 10. Guía: 3.
+  Bonificador más 3. Total 13. Éxito."), sent to camp.
+- Built after save 91, not yet heard: message boxes without a title are titled "Mensaje" (was
+  "Dialog_box"); a notification whose parameter has no text ("Has usado: .") takes the line as
+  the banner shows it; in combat a thing farther than 3 m is walked to and used with one click
+  when the game's hover preview says the walk fits this turn (else the Move cursor as before);
+  the rest screen says each food's supplies. From the forest below the Blighted Village no route
+  reaches the grove, Ethel or the village (deep water east; the roots only go down); reachable:
+  the chapel ruins, the Roadside Cliffs waypoint.
+- The grove again (saves 92-93): from the Roadside Cliffs waypoint, Explore north three times
+  (the grove gate area: "Antiguo círculo de sellos"); routes to the grove existed only through
+  the closed "Verja levadiza reparada" (ignoring doors); markers > Arron: the gate opened as the
+  party came ("Zona: Arboleda Esmeralda ... Llegada: Arron"). Auntie Ethel (her marker had seemed
+  unreachable: she was in the grove behind that gate): the first talk click after the walk was
+  lost again (now retried after 4 s when no screen opens), her conversation about the tadpole
+  (house marked on the map, a greater healing potion received), her trade (a tomato, 3 supplies).
+  Arabella's parents: "Completadas, Salva a Arabella".
+- The quest reward window (save 93, "Salva a Arabella") was not read at all ("RewardPanel, nada
+  que leer") and waits until accepted: now a list ("Recompensa: Salva a Arabella. Arabella está a
+  salvo... Lo recibe Tav: Colgante de Komira, Poco común, valor 65. Aceptar, botón."; Ctrl+D:
+  "Otorga: Luces danzantes..."), Accept closed it (verified). Optional reward choices: built, not
+  met yet. "Mensajes en pantalla" verified empty in the grove ("No hay ningún mensaje en
+  pantalla"; a collapsed "Turno medioambiental" was read before the Visibility check).
+- Food and rest (save 95): Arron's food listed with supplies ("Fuente de morcillas, 12 de
+  suministros, 30 de oro"); the talisman sold, 41 supplies: a full long rest (the rest screen
+  now lists each food's supplies, verified); Scratch in camp ("Rasca quiere hablar").
+- The teahouse (Tetería, Auntie Ethel's house, marked by her; saves 95-96): from the grove the
+  trip went to the nearest point inside (its gate shut behind us); out to the Roadside Cliffs
+  (the gate opened), then toward the teahouse: to the Blighted Village, "no se ha encontrado
+  camino" 96 m short; Explore south-west three times to 99 m, then "No hay por dónde caminar".
+  No route from the village, the Roadside Cliffs or the forest pocket (probed with the path's
+  SourceAdjusted). Open: how a player reaches it (a path the pathfinder does not have, a jump,
+  or a region that only connects when loaded).
+- Not yet heard in play: the passage fallback itself (built after the pens' entrance was used by
+  hand), the opportunity-attack warning before a use in combat.
+  Seen but not handled: the tadpole powers screen (TadpolePowersTree) opened by itself once during
+  end-turn presses (generic list); Arcane Recovery unavailable after a short rest; Tav's ranged
+  attack unavailable once with the bow equipped.
+
 ## 7. Harness recipes (tools/game.py)
 
 - Start: `python tools/game.py launch`; splash needs a key: `press space`; Continue:

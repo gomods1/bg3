@@ -138,7 +138,10 @@ function Targeting:Build()
         out[#out + 1] = Controls.Item({
             kind = "button",
             describe = function() return L("target_place_item") end,
-            activate = function() self.choosePlace() end,
+            activate = function()
+                self.handedOver = true -- its own place cursor takes over the same action
+                self.choosePlace()
+            end,
         })
     end
     return out
@@ -150,14 +153,22 @@ function Targeting:Speak(control)
     Speech.Say(control.Describe(), { interrupt = true })
     if not t then return end
     local index = self.index
-    local centred, turned = false, false
+    local centred, turned, told = false, false, false
     local function onHover(ok, reason)
         if self.index ~= index then return end -- the player moved on
+        -- The camera moves below can take 10-15 s in all (an archer on a ledge in the worg pens:
+        -- the preview came 16 s after the name, 2026-09-25): say that the aim goes on.
+        if not ok and not told and (reason == "reason_offscreen" or reason == "reason_no_cursor") then
+            told = true
+            Speech.Say(L("target_aiming", { name = t.name or "?" }))
+        end
         if not ok and reason == "reason_offscreen" and not centred and Combat.CenterCameraOn(t.uuid) then
             -- Bring the target to the screen centre (the game's camera command), as a sighted
             -- player pans the camera to it.
             centred = true
-            Timer.After(CAMERA_SETTLE_MS, function() Activate.Hover(t.uuid, onHover) end)
+            Timer.After(CAMERA_SETTLE_MS, function()
+                if self.index == index then Activate.Hover(t.uuid, onHover) end
+            end)
             return
         end
         if not ok and (reason == "reason_offscreen" or reason == "reason_no_cursor") and not turned then
@@ -166,7 +177,9 @@ function Targeting:Speak(control)
             turned = true
             local me, p = Entities.Position(Entities.Controlled()), Entities.Position(t.uuid)
             if me and p then
-                Camera.TurnToward(p[1] - me[1], p[3] - me[3], function() Activate.Hover(t.uuid, onHover) end)
+                Camera.TurnToward(p[1] - me[1], p[3] - me[3], function()
+                    if self.index == index then Activate.Hover(t.uuid, onHover) end
+                end)
                 return
             end
         end
@@ -176,6 +189,7 @@ function Targeting:Speak(control)
             -- aimed at, 2026-09-25). Put back when targeting ends.
             Camera.SetTactical(true, function(changed)
                 self.tactical = changed and "mine" or "was"
+                if self.index ~= index then return end
                 if changed then Activate.Hover(t.uuid, onHover) else onHover(false, reason) end
             end)
             return
@@ -201,7 +215,7 @@ function Targeting:AreaWords(uuid)
     return Words.AreaCatches(caught, uuid)
 end
 
-function Targeting:Activate()
+function Targeting:Activate(aimed)
     if self.index > #self.targets then return ListScreen.Activate(self) end -- the place item
     local t = self.targets[self.index]
     if not t then
@@ -209,6 +223,14 @@ function Targeting:Activate()
         return
     end
     local function failed(reasonKey)
+        -- The game's own reason when it has one: Scorching Ray on an archer answered "the game
+        -- did not react" three times while the preview said "¡Un obstáculo bloquea el paso!"
+        -- (the hover check had lapsed, so the command was tried; worg pens, 2026-09-25).
+        local p = Preview.Read()
+        if not p.canExecute and #p.messages > 0 then
+            Speech.Say(Words.Preview(p, nil, self.spellInfo), { interrupt = true })
+            return
+        end
         Speech.Say(L("could_not_activate", { label = t.name or "?", reason = L(reasonKey or "reason_unavailable") }), { interrupt = true })
     end
     if Activate.IsHovering(t.uuid) then
@@ -232,10 +254,28 @@ function Targeting:Activate()
             return
         end
     end
+    if not aimed and not Activate.IsHovering(t.uuid) then
+        -- Aim at it first: the portrait command acted on whoever the cursor was over (Sacred
+        -- Flame meant for Azak hit Roah, 2026-09-25). Only when it cannot be aimed at is the
+        -- command used.
+        local index = self.index
+        Activate.Hover(t.uuid, function(ok)
+            if self.index ~= index then return end
+            self:Activate(true)
+        end)
+        return
+    end
     if t.world then
         failed("reason_no_cursor") -- no view model: only a click on it can confirm
         return
     end
+    if aimed and not Activate.IsHovering(t.uuid) and not self.parkedForCommand then
+        -- The aim failed where the cursor may rest on someone else: off the world first.
+        self.parkedForCommand = true
+        Activate.Park(function() self:Activate(true) end)
+        return
+    end
+    self.parkedForCommand = false
     local before = self:Before()
     if not Combat.TargetArmedAction(t.uuid) then
         failed("reason_unavailable")
@@ -330,7 +370,7 @@ end
 -- under way (Gale's Fire Bolt: a screen came up during the cast, and targeting reopened for the
 -- attack the game armed next, 2026-09-25): nothing to reopen.
 function Targeting:OnReplaced()
-    if not self.confirming then Hud.FollowAgain() end
+    if not self.confirming and not self.handedOver then Hud.FollowAgain() end
 end
 
 function Targeting:Help()
@@ -340,7 +380,7 @@ end
 function Targeting:OnKey(combo)
     if combo == "ESCAPE" and #self.levels == 0 then
         -- The game's ActionCancel; with nothing armed Escape would open the game menu.
-        if Hotbar.Armed() then Activate.Key("ESCAPE") end
+        if Hotbar.Armed() then Activate.CancelArmed() end
         Speech.Say(L("cancelled"), { interrupt = true })
         self:Close()
         return true

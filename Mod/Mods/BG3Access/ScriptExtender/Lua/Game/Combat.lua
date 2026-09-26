@@ -18,6 +18,14 @@ local function dc()
     return nil
 end
 
+-- Whether the HUD is showing (the hotbar is visible). The game menu, the map and other screens
+-- hide the whole HUD, the turn order bar included, in the middle of a fight: Current() then reads
+-- nil although the fight goes on ("Fin del combate" was said on opening the game menu, and
+-- "Combate" again on closing it, 2026-09-25).
+function Combat.HudShown()
+    return Ui.FindWidget("HotBar") ~= nil
+end
+
 -- Combat id (string) while a combat is running, else nil.
 function Combat.Current()
     local d = dc()

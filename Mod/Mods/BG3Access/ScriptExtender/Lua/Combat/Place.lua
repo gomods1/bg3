@@ -25,6 +25,9 @@ local Travel = Ext.Require("Exploration/Travel.lua")
 local CombatLog = Ext.Require("Game/CombatLog.lua")
 local Timer = Ext.Require("Core/Timer.lua")
 local Hud = Ext.Require("Screens/Hud.lua")
+local Paths = Ext.Require("Game/Paths.lua")
+local TravelClicks = Ext.Require("Exploration/TravelClicks.lua")
+local SurfaceName = TravelClicks.SurfaceName
 
 local L = Strings.Get
 
@@ -99,12 +102,26 @@ function Place:AtCursor()
             surface = preview.surface, opportunityAttack = preview.opportunityAttack, advantages = 0, disadvantages = 0 }
     end
     local caught = Area.Catches(self.spell, self.me, self.point)
+    -- A walk in combat follows the game's own path, through fire or electrified water if that is
+    -- the way (Shadowheart, Gale and Tav each walked through electrified water to Gut's passage,
+    -- 2026-09-25): the first dangerous surface on the route is said.
+    local crosses = nil
+    if self.move and Combat.Current() then
+        local route = Paths.Find(self.me, self.point)
+        local surface = nil
+        if route and route.found then
+            local _
+            _, surface = Paths.FirstDanger(self.me, route.points, 2)
+        end
+        if surface then crosses = L("move_crosses", { surface = SurfaceName(surface) }) end
+    end
     return Strings.List({
         covered and L("place_on_self"),
         uuid and uuid ~= self.me and L("place_on", { name = Entities.Name(uuid) or "?" }),
         preview.canExecute and L("place_possible"), -- said, so a valid place is never silence
         Words.Preview(preview, "movement_cost", Spells.Info(self.spell)),
         caught and Words.AreaCatches(caught),
+        crosses,
     })
 end
 
@@ -296,7 +313,7 @@ function Place:OnKey(combo)
     if combo == "RETURN" or combo == "KP_ENTER" then self:Confirm() return true end
     if combo == "ESCAPE" then
         -- The game's ActionCancel; with nothing armed Escape would open the game menu.
-        if Hotbar.Armed() then Activate.Key("ESCAPE") end
+        if Hotbar.Armed() then Activate.CancelArmed() end
         Speech.Say(L("cancelled"), { interrupt = true })
         self:Close()
         return true

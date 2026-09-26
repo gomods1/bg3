@@ -7,6 +7,9 @@
 --   Character: level and experience, classes, armour class, abilities, notable traits.
 -- Escape is the game's (closes the panel) at the top level.
 local Game = Ext.Require("Game/Inventory.lua")
+local Combat = Ext.Require("Game/Combat.lua")
+local Player = Ext.Require("Game/Player.lua")
+local Vm = Ext.Require("Game/Vm.lua")
 local Speech = Ext.Require("Core/Speech.lua")
 local Strings = Ext.Require("Core/Strings.lua")
 local ListScreen = Ext.Require("Screens/ListScreen.lua")
@@ -21,9 +24,34 @@ local Inventory = ListScreen.Extend()
 Inventory.Widgets = { Game.Widget }
 
 local READBACK_MS = 400 -- equipping is deferred: read the result on a later frame
+local CONFIRM_MS = 8000
+
+-- The panel shows the controlled character: the game's [ and ] keys (or F1-F4) switch to another
+-- party member with the panel open, and the lists follow (verified 2026-09-25, goblin camp).
+local function owner()
+    local vm = Player.SelectedCharacter()
+    return Vm.Get(vm, "EntityUUID"), Vm.Text(vm, "Name")
+end
+
+local function titleFor(name)
+    return name and L("label_value", { label = L("screen_character_panel"), value = name }) or L("screen_character_panel")
+end
 
 function Inventory.New(widget)
-    return setmetatable(ListScreen.New(widget.name, L("screen_character_panel")), Inventory)
+    local uuid, name = owner()
+    local self = setmetatable(ListScreen.New(widget.name, titleFor(name)), Inventory)
+    self.owner = uuid
+    return self
+end
+
+function Inventory:Tick()
+    ListScreen.Tick(self)
+    local uuid, name = owner()
+    if not uuid or uuid == self.owner then return end
+    self.owner = uuid
+    self.title = titleFor(name)
+    self:Refresh()
+    Speech.Say(Strings.Sentences({ self.title, self:Summary() }), { interrupt = true })
 end
 
 function Inventory:ItemsList()
@@ -32,8 +60,20 @@ function Inventory:ItemsList()
         local control = Controls.Item({
             kind = "button",
             describe = function() return ItemWords.Line(item) end,
-            details = function() return item.description end,
+            details = function() return ItemWords.Details(item) end,
             activate = function()
+                -- Equipping in combat spends the action (the game's rule; only the weapon set
+                -- switch is free): Tav's shortbow cost his turn's action unannounced (worg pens,
+                -- 2026-09-25). A second Enter within CONFIRM_MS equips.
+                if item.isEquipment and not item.equipped and Combat.Current() then
+                    local now = Ext.Timer.MonotonicTime()
+                    if not (self.confirmEquip == item.uuid and now < (self.confirmUntil or 0)) then
+                        self.confirmEquip, self.confirmUntil = item.uuid, now + CONFIRM_MS
+                        Speech.Say(L("equip_costs_action", { name = item.name }), { interrupt = true })
+                        return
+                    end
+                    self.confirmEquip = nil
+                end
                 if not Game.Use(item.slot) then
                     Speech.Say(L("could_not_activate", { label = item.name, reason = L("reason_unavailable") }), { interrupt = true })
                     return
@@ -61,7 +101,7 @@ function Inventory:EquipmentList()
             describe = function()
                 return L("label_value", { label = slot.label, value = slot.item and ItemWords.Line(slot.item) or L("slot_empty") })
             end,
-            details = function() return slot.item and slot.item.description end,
+            details = function() return ItemWords.Details(slot.item) end,
             activate = function()
                 if not slot.item then
                     Speech.Say(L("slot_empty"), { interrupt = true })

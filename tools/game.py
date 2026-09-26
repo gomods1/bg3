@@ -142,6 +142,10 @@ VK = {"enter": 0x0D, "esc": 0x1B, "escape": 0x1B, "up": 0x26, "down": 0x28, "lef
 EXTENDED = {0x25, 0x26, 0x27, 0x28, 0x24, 0x23, 0x21, 0x22, 0x2D, 0x2E, 0xA5}
 BY_VK = {0x13}  # keys sent as virtual keys, not scancodes
 MODS = {"ctrl": 0x1D, "shift": 0x2A, "alt": 0x38}
+# Keys named by their US-layout position, sent as raw scancodes (the game binds scancodes; a
+# virtual key would move with the keyboard layout: the Spanish layout has no "]" key).
+RAW_SC = {"lbracket": 0x1A, "rbracket": 0x1B, "backtick": 0x29, "semicolon": 0x27, "quote": 0x28,
+          "backslash": 0x2B, "slash": 0x35, "equals": 0x0D}
 
 
 def press_keys(keys, hold_ms=90):
@@ -163,6 +167,16 @@ def press_keys(keys, hold_ms=90):
         parts = k.lower().split("+")
         held = [MODS[p] for p in parts[:-1]]
         name = parts[-1]
+        if name in RAW_SC:
+            for m in held:
+                send_scan(m, False, True)
+            send_scan(RAW_SC[name], False, True)
+            time.sleep(hold / 1000)
+            send_scan(RAW_SC[name], False, False)
+            for m in reversed(held):
+                send_scan(m, False, False)
+            time.sleep(0.3)
+            continue
         if name in VK:
             vk = VK[name]
         elif len(name) == 1:

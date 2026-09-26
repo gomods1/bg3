@@ -20,6 +20,8 @@ local FAR_CANDIDATE_SPACING = 3.0
 local MAX_FAR_CANDIDATES = 5
 local MAX_CANDIDATES = 10
 local ARRIVE_METERS = 2.5   -- GoTo: close enough to a point
+local DOOR_USE_NEAR = 3.0   -- a shut door on the only way is tried from this close
+local DOOR_STOP_METERS = 1.5 -- the walk up to it stops this far before it
 -- A click is on the route when the ground it picks lies this close to any route point: the
 -- route's heights do not always follow the terrain (measured on the way to the grove: aimed at a
 -- point 1.9 m above the ground there, the picking hit the path 4.5 m further along).
@@ -122,8 +124,24 @@ local function candidates(me, target)
     local route = SafeRoute.Find(me, target)
     if not route or not route.found or #route.points == 0 then
         local door = Paths.ClosedDoorOnWay(me, target)
-        if door then return nil, "reason_door_closed", nil, { door = Entities.Name(door) or "?" } end
-        return nil, "reason_no_path"
+        if not door then return nil, "reason_no_path" end
+        -- A shut door is the only way: walk up to it and try it, as a player clicks a door (a
+        -- key in the pack unlocks it: Priestess Gut's chapel door with her key, 2026-09-25).
+        local doorPos, here = Entities.Position(door), Entities.Position(me)
+        local detail = { door = Entities.Name(door) or "?", doorUuid = door }
+        if doorPos and here and Entities.Distance(here, doorPos) <= DOOR_USE_NEAR then
+            return nil, "door_to_open", nil, detail
+        end
+        local through = Paths.Find(me, target, { ignoreDoors = true })
+        local limit = 0
+        for i, q in ipairs(through and through.found and through.points or {}) do
+            if doorPos and Entities.Distance(q, doorPos) <= DOOR_STOP_METERS then break end
+            limit = i
+        end
+        if limit == 0 then return nil, "door_to_open", nil, detail end
+        local out, info = clickablePoints(me, through, limit)
+        if #out > 0 then return out, nil, info end
+        return nil, "reason_door_closed", nil, detail
     end
     local limit = #route.points
     if route.portals[1] then limit = math.max(1, route.portals[1] - 1) end

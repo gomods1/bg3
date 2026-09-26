@@ -61,7 +61,7 @@ function Actions:Describe(a)
         parts[#parts + 1] = L("spell_level", { n = a.spellLevel })
     end
     if COSTS[a.cost or ""] then parts[#parts + 1] = L(COSTS[a.cost]) end
-    if not a.canUse then parts[#parts + 1] = L("unavailable") end
+    if not Hotbar.CanUse(a.bar, a.slot) then parts[#parts + 1] = L("unavailable") end
     return Strings.List(parts)
 end
 
@@ -134,7 +134,7 @@ function Actions:Use(a)
         if v.level == level and level ~= a.spellLevel then variant = v end
     end
     if variant then spell = variant.id or spell end
-    local armed = variant and (variant.canUse and Hotbar.UseAt(a.bar, a.slot, level)) or (not variant and a.canUse and Hotbar.Use(a.bar, a.slot))
+    local armed = variant and (variant.canUse and Hotbar.UseAt(a.bar, a.slot, level)) or (not variant and Hotbar.CanUse(a.bar, a.slot) and Hotbar.Use(a.bar, a.slot))
     if not armed then
         refuse(a.name)
         return

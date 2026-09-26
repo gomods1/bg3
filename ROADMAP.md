@@ -35,6 +35,11 @@ Tick only what was verified in the running game. Status detail lives in `STATUS.
   menu): name, class and subclass, level, race, background, hit points, armour class, abilities,
   traits, approval, resistances, statuses (Gale, Chock the ogre); the character panel's sheet
   reads the same way
+- [x] Quest reward window (RewardPanel: it waits for Accept): quest, what was done, who receives
+  what, items to choose, Accept (verified: "Recompensa: Salva a Arabella ... Colgante de Komira")
+- [x] "Mensajes en pantalla" (mod menu): every short-lived text on screen now: the cursor's lines,
+  the hotbar's "cannot act" line, the banner, side tutorials; the hotbar's "No se puede
+  controlar: ..." is also said when it appears
 - [ ] Other notifications; inspiration reroll with a point (offered only then)
 
 ## M2 Menus
@@ -102,7 +107,11 @@ Tick only what was verified in the running game. Status detail lives in `STATUS.
   joins them ("Grupo unido") (CurrentPlayer.PartyGroups)
 - [x] World cursor: the Move command's cursor (arrows, Shift for 5 m) reads the place and the
   game's preview; outside combat Enter walks there (Travel), in combat it is the previewed click
-- [ ] Jumps on routes
+- [ ] Jumps on routes (research 2026-09-25: routes can be planned from any point by setting the
+  path's SourceAdjusted, so a jump search is possible; Auntie Ethel's teahouse was not reachable
+  from the Blighted Village side and the gap was not a jump)
+- [x] Ladders down a cliff (the character's body on the top: step back, then the tactical camera)
+- [x] A shut door on the only way is walked up to and tried (a key in the pack opens it)
 ## M5 Combat
 - [x] Combat start, whose turn with resources, turn order list, status key
 - [x] Actions list; targeting with preview; confirm by game command (melee verified)
@@ -125,6 +134,14 @@ Tick only what was verified in the running game. Status detail lives in `STATUS.
 - [x] Throw: step 1 lists only what the character can lift (movable, not too heavy), step 2
   where it goes (creatures, things, a place); a fork, a pot and a chair thrown; "Lanzar" from an
   item's actions and the game's own keys (X, number keys) are followed by the mod's targeting
+- [x] The cursor never rests on an enemy after targeting (parked on the minimap): the game's
+  hover preview of the main-hand attack ("No tienes suficientes recursos: Acción") no longer
+  sticks nor passes for an armed action; the preview's "[1]" reads filled; combat start/end not
+  said around the game menu
+- [x] The worg pens fight (8 enemies, allied bear) won by keyboard; failed confirms say the
+  game's reason; slow aims say the camera is turning; damage to things named right
+- [ ] Opportunity-attack warning before walking to a thing in combat (built, not yet heard);
+  faster aiming at targets on ledges
 ## M6 Inventory and progression
 - [x] Character panel: inventory (use/equip), equipment, sheet
 - [x] Level up: features, HP, resources, subclass list, spell choices (verified grid clicks), Accept
@@ -134,7 +151,15 @@ Tick only what was verified in the running game. Status detail lives in `STATUS.
 - [ ] Level up: feats, ability improvements, spell replacement, prepare tab; barter mode
 - [x] Loot: Enter takes one item (TakeItemCommand.ActionCommand(item)), Space takes all
 - [x] Item actions in the character panel: the game's own context menu (send to camp, to a
-  companion, drop, split, examine...) as a sub-list from the mod menu (verified: bucket to Gale)
+  companion, drop, split, examine...) as a sub-list from the mod menu (verified: bucket to Gale);
+  what was done is said ("Hecho: Enviar a: Gale")
+- [x] Weapon and armour details (Ctrl+D): damage dice and type, versatile die, properties,
+  weapon class, proficiency of the character, weapon actions, armour class, enchantment, weight
+  (inventory, equipment, loot, trade)
+- [x] The character panel names its character and follows [ ] / F1-F4 to another party member
+- [x] Equip from the floor (Acciones > Equipar), a disarmed weapon taken back in combat
+- [ ] Equipping in combat confirmed first (spends the action): built, not yet heard
+- [ ] Learning a scroll (Gale: "Aprender conjuro", needs 50 gold): read, not done
 ## M7 Blindfold playthrough, act by act
 ## M8 Polish (verbosity, cues, localization of mod strings, co-op decision)
 - [x] Game language detected (GlobalSwitches.Language), Spanish table (all keys), strings checker

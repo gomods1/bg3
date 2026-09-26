@@ -111,8 +111,27 @@ local function describe(g)
         e.target = chars[2] and chars[2].name
     elseif e.kind == "miss" then
         e.actor, e.subject = firstChar and firstChar.name, chars[2] and chars[2].name
-    elseif e.kind == "damage" or e.kind == "killed" then
-        e.subject = lastChar and lastChar.name -- "[2] ha recibido", "[1] ha matado a [2]"
+    elseif e.kind == "damage" then
+        -- The damaged is the reference just before the damage in the template, a character or a
+        -- thing: "[2] ha recibido un impacto de [3]" (Pulgoso's bite on "Rejilla de celda
+        -- ruidosa" was said as "Pulgoso: Mordisco, 4 de daño" when the last character was
+        -- taken), "[1] ha impactado a [2] e inflige [3]" (a thrown handaxe: [1] is the axe,
+        -- 2026-09-25).
+        local params = Vm.List(ctx, "Params")
+        local prev, subjectIndex = nil, nil
+        for n in tostring(Vm.Get(ctx, "Text") or ""):gmatch("%[(%d+)%]") do
+            n = tonumber(n)
+            local p = params[n]
+            if p and Vm.Enum(p, "Type") == "Damage" then
+                subjectIndex = prev
+                break
+            end
+            prev = n
+        end
+        local p = subjectIndex and params[subjectIndex]
+        e.subject = (p and tostring(Vm.Get(p, "Text") or "")) or (lastChar and lastChar.name)
+    elseif e.kind == "killed" then
+        e.subject = lastChar and lastChar.name -- "[1] ha matado a [2]"
     elseif e.kind ~= "speech" and firstChar and tostring(Vm.Get(ctx, "Text") or ""):find("^%[" .. firstChar.index .. "%]") then
         -- Only a line that starts with the character loses it ("[1] ha recibido el estado..."):
         -- "Han curado a [1] un total de 7 puntos de golpe" would lose its grammar (gate fight).

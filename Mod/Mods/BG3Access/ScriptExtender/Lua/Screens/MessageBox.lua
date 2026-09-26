@@ -12,14 +12,15 @@ local MessageBox = ListScreen.Extend()
 MessageBox.DcTypes = { Game.DcType }
 
 function MessageBox.New(widget)
-    return setmetatable(ListScreen.New(widget.name, widget.name), MessageBox)
+    return setmetatable(ListScreen.New(widget.name, L("screen_message")), MessageBox)
 end
 
 function MessageBox:Build()
     local box = Game.Read(self.widget)
     local controls = {}
     if not box then return controls end
-    self.title = box.title or self.widget
+    -- Boxes without a title (the long rest's questions) were titled "Dialog_box".
+    self.title = box.title or L("screen_message")
     local widget = self.widget
     if box.checkbox then
         controls[#controls + 1] = Controls.CheckBox({

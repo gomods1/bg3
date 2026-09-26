@@ -28,6 +28,7 @@ local Notices = Ext.Require("Exploration/Notices.lua")
 local Journal = Ext.Require("Exploration/Journal.lua")
 local Waypoints = Ext.Require("Exploration/Waypoints.lua")
 local Explore = Ext.Require("Exploration/Explore.lua")
+local OnScreen = Ext.Require("Game/OnScreen.lua")
 local WhereAmI = Ext.Require("Exploration/WhereAmI.lua")
 local Places = Ext.Require("Exploration/Places.lua")
 local Signposts = Ext.Require("Exploration/Signposts.lua")
@@ -192,6 +193,13 @@ function Setup.Register()
 
     -- The screen in front
     Commands.Register({ id = "readScreen", group = "screen", run = Router.ReadScreen })
+    Commands.Register({
+        id = "screenMessages", group = "screen", available = Router.InGame,
+        run = function()
+            local texts = OnScreen.Messages()
+            Speech.Say(#texts > 0 and Strings.Sentences(texts) or Strings.Get("screen_messages_none"), { interrupt = true })
+        end,
+    })
     Commands.Register({ id = "details", group = "screen", run = Router.Details })
     Commands.Register({ id = "help", group = "screen", run = function() Help.Speak(Router.HelpLines()) end })
     Commands.Register({

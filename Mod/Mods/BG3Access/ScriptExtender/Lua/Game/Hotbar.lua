@@ -17,6 +17,7 @@
 -- buttons run UseSlotCommand with that VM: it arms the spell at that level directly (verified
 -- 2026-09-24: UIData.ActiveTask.Upcast.SlotLevel 2, RootCastSpell Projectile_MagicMissile).
 local Vm = Ext.Require("Game/Vm.lua")
+local Ui = Ext.Require("Game/Ui.lua")
 local Player = Ext.Require("Game/Player.lua")
 local Spells = Ext.Require("Game/Spells.lua")
 
@@ -88,6 +89,30 @@ function Hotbar.Actions()
         if a.barOrder ~= b.barOrder then return a.barOrder < b.barOrder end
         return a.slot < b.slot
     end)
+    return out
+end
+
+-- Whether the action in bar b, slot s can be used right now (read live: while Rage's animation
+-- plays every action reads unusable, and a list built then kept Reckless Attack "unavailable",
+-- 2026-09-25).
+function Hotbar.CanUse(b, s)
+    local bar = bars()[b]
+    local slot = bar and Vm.List(bar, "SlotList")[s]
+    return Vm.Get(slot, "CanUse") == true
+end
+
+-- Why the controlled character cannot act, as the hotbar shows it ("No se puede controlar:
+-- derribado" while Tav lay prone on ice, 2026-09-25): the shown texts of the HotBar's
+-- CapabilitiesErrors (PlayerCharacterProperties.ModifiedCapabilities, the first one shown).
+-- nil while the hotbar is hidden (a menu over it).
+function Hotbar.CapabilityMessages()
+    local panel = Ui.FindElement("HotBar", "CapabilitiesErrors")
+    if not panel then return nil end
+    local out = {}
+    for _, el in ipairs(panel and Ui.FindAllByName(panel, "Message") or {}) do
+        local text = Ui.IsShown(el) and Ui.InlineText(el)
+        if text then out[#out + 1] = text end
+    end
     return out
 end
 

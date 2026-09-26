@@ -63,7 +63,7 @@ local function itemControls(self, items, buying)
         out[#out + 1] = Controls.Item({
             kind = "button",
             describe = function() return priceLine(item) end,
-            details = function() return item.description end,
+            details = function() return ItemWords.Details(item) end,
             activate = function() self:Exchange(item, buying) end,
         })
     end

@@ -7,6 +7,7 @@
 -- mod's targeting (Hud.OnArmed, wired by Setup/Commands to Combat/Actions.FollowArmed).
 local Combat = Ext.Require("Game/Combat.lua")
 local Hotbar = Ext.Require("Game/Hotbar.lua")
+local Activate = Ext.Require("Game/Activate.lua")
 local Characters = Ext.Require("Game/Characters.lua")
 local Player = Ext.Require("Game/Player.lua")
 local Words = Ext.Require("Combat/Words.lua")
@@ -21,14 +22,26 @@ Hud.__index = Hud
 Hud.Widgets = { "(hud)" }
 
 local CONFIRM_MS = 8000 -- the reminder alone takes about 3 s to say
-local ARMED_SETTLE_MS = 700 -- a potion drunk by its key sets the armed slot for ~400 ms too
+local ARMED_SETTLE_MS = 1200 -- the park (up to 600 ms after a click, then ~750 ms); a potion drunk
+-- by its key sets the armed slot for ~400 ms too
 
 -- OnArmed(action) (Game/Hotbar.ArmedAction): set by Setup/Commands.
 Hud.OnArmed = nil
 
 -- One armed spell of the game (from armed to not armed): followed once, by the mod's own
 -- targeting (Hud.Followed) or here. Module state: HUD instances come and go with other screens.
-local followed, armedAt = false, nil
+-- The cursor resting on an enemy (where the mod's targeting left it) looks exactly like an armed
+-- main-hand attack (Activate.Park): the cursor is parked first, and only an action still armed
+-- after that was armed by the player.
+local followed, armedAt, parked = false, nil, false
+-- Which armed action was followed: another one armed without the state ever going empty (a
+-- thrown handaxe's "Lanzar" right after a cancelled attack that stayed armed, 2026-09-25) is
+-- followed anew.
+local followedKey = nil
+local function armedKey()
+    local a = Hotbar.ArmedAction()
+    return a and table.concat({ tostring(a.id), tostring(a.name), tostring(a.object and a.object.uuid) }, "|") or nil
+end
 
 -- The mod's targeting took the armed action in hand.
 function Hud.Followed()
@@ -37,8 +50,9 @@ end
 
 -- The mod's targeting was closed by a game screen with the action still armed: follow it again.
 function Hud.FollowAgain()
-    followed, armedAt = false, nil
+    followed, armedAt, parked, followedKey = false, nil, false, nil
 end
+
 -- Resources worth a confirmation (movement alone is often left over on purpose).
 local MAIN_RESOURCES = { ActionPoint = true, BonusActionPoint = true }
 
@@ -50,16 +64,25 @@ function Hud:Open() end
 
 function Hud:Tick()
     if not Hotbar.Armed() then
-        followed, armedAt = false, nil
+        followed, armedAt, parked, followedKey = false, nil, false, nil
         return
     end
-    if followed then return end
+    if followed then
+        local key = armedKey()
+        followedKey = followedKey or key
+        if key == followedKey then return end
+        followed, armedAt, parked, followedKey = false, nil, false, nil
+    end
     local now = Ext.Timer.MonotonicTime()
-    armedAt = armedAt or now
+    if not parked then
+        parked, armedAt = true, now
+        Activate.Park()
+        return
+    end
     if now - armedAt < ARMED_SETTLE_MS then return end
     local a = Hotbar.ArmedAction()
-    -- In combat the game arms the main-hand attack by itself after a spell, even with no action
-    -- left (Shadowheart after Guiding Bolt, 2026-09-25): only an action that can be used now.
+    -- Only an action that can be used now (before the park existed, the cursor left on a target
+    -- after a spell looked like an armed main-hand attack with no action left, 2026-09-25).
     if a and a.canUse and a.useType ~= "Potion" and Hud.OnArmed then
         followed = true
         Hud.OnArmed(a)

@@ -34,6 +34,7 @@ local function supplyControl(i)
         local s = r and r.supplies[i]
         if not s then return nil end
         return Strings.List({ s.name, s.count and s.count > 1 and L("camp_supply_count", { n = s.count }),
+            s.perUnit and s.perUnit > 0 and L("item_supplies", { n = s.perUnit }),
             s.selected > 0 and L("camp_supply_used", { n = s.selected }) })
     end
     return Controls.Item({

@@ -21,12 +21,22 @@ local Items = Ext.Require("Game/Items.lua")
 local Signposts = Ext.Require("Game/Signposts.lua")
 local ItemWords = Ext.Require("Screens/ItemWords.lua")
 local ContextMenuList = Ext.Require("Screens/ContextMenuList.lua")
+local ContextMenu = Ext.Require("Game/ContextMenu.lua")
+local Preview = Ext.Require("Game/Preview.lua")
 local Speech = Ext.Require("Core/Speech.lua")
 local Strings = Ext.Require("Core/Strings.lua")
 local ListScreen = Ext.Require("Screens/ListScreen.lua")
 local Controls = Ext.Require("Screens/Controls.lua")
+local Ui = Ext.Require("Game/Ui.lua")
+local Timer = Ext.Require("Core/Timer.lua")
 
 local L = Strings.Get
+
+-- After using a passage: how long until the party must have been moved, and how far.
+local PASSAGE_CHECK_MS = 6000
+local TALK_CHECK_MS = 4000
+local CONFIRM_MS = 8000
+local PASSAGE_MOVED_METERS = 8
 
 local PlaceList = ListScreen.Extend()
 
@@ -143,6 +153,7 @@ function PlaceList:MoveToward(e)
 end
 
 local USE_REACH_METERS = 3 -- in combat, objects this close are used with a click (the game walks the rest)
+local USE_TRY_METERS = 18 -- farther, a click is tried when the game's preview says the walk fits
 
 function PlaceList:Use(e)
     -- A trap is never walked onto (a click on it walks there; disarming is the game's own action).
@@ -152,16 +163,37 @@ function PlaceList:Use(e)
     end
     if Combat.Current() and self.open then
         local d = distanceTo(e)
-        if e.uuid and not Entities.IsCharacter(e.uuid) and d and d <= USE_REACH_METERS then
+        if e.uuid and not Entities.IsCharacter(e.uuid) and d and d <= USE_TRY_METERS then
             -- An object within reach: the player's click on it (never on a character: that
             -- click attacks).
-            Speech.Say(L("using", { name = e.name or "?" }), { interrupt = true })
-            Activate.WorldClick(e.uuid, function(ok, reason)
-                if ok then
-                    self:Close("")
-                else
-                    Speech.Say(L("could_not_activate", { label = e.name or "?", reason = L(reason or "reason_no_cursor") }), { interrupt = true })
+            -- The walk to it can leave an enemy's reach: the game's hover preview warns of the
+            -- attack of opportunity (Tav walking to his dropped greataxe took one from Zurk with
+            -- no warning, 2026-09-25); a second Enter within CONFIRM_MS goes anyway.
+            local function fail(reason)
+                Speech.Say(L("could_not_activate", { label = e.name or "?", reason = L(reason or "reason_no_cursor") }), { interrupt = true })
+            end
+            Activate.Hover(e.uuid, function(ok, reason)
+                local preview = ok and Preview.Read()
+                -- Farther than arm's reach, the game's hover preview says whether the walk to it
+                -- fits this turn (Gut's passage 4 m away needed a separate Move and a second
+                -- Enter, 2026-09-25): a click then walks and uses it; else the Move cursor.
+                if (not ok or not preview.canExecute) and d > USE_REACH_METERS then
+                    self:MoveToward(e)
+                    return
                 end
+                if not ok then fail(reason) return end
+                local now = Ext.Timer.MonotonicTime()
+                local confirmed = self.confirmUse == e.uuid and now < (self.confirmUseUntil or 0)
+                if preview.opportunityAttack and not confirmed then
+                    self.confirmUse, self.confirmUseUntil = e.uuid, now + CONFIRM_MS
+                    Speech.Say(L("use_provokes", { name = e.name or "?" }), { interrupt = true })
+                    return
+                end
+                self.confirmUse = nil
+                Speech.Say(L("using", { name = e.name or "?" }), { interrupt = true })
+                Activate.ClickHovered(e.uuid, function(clicked, why)
+                    if clicked then self:Close("") else fail(why) end
+                end)
             end)
             return
         end
@@ -169,7 +201,30 @@ function PlaceList:Use(e)
         return
     end
     Speech.Say(L("going_to", { name = e.name or "?" }), { interrupt = true })
-    local function done(ok, reasonKey, detail)
+    local retried = false
+    local done
+    -- A passage (an item portal: the Shattered Sanctum's "Puertas pesadas de roble", cave mouths)
+    -- takes the party elsewhere: a use click that moved nobody was lost or refused (the first
+    -- click on the Sanctum's doors after a 60 m walk did nothing; the worg pens' entrance answered
+    -- "No puedes llegar", 2026-09-25): the thing's menu "Use" is tried once.
+    local function checkPassage()
+        local from = Entities.Position(Entities.Controlled())
+        Timer.After(PASSAGE_CHECK_MS, function()
+            local now = Entities.Position(Entities.Controlled())
+            if not (from and now) or Entities.Distance(from, now) > PASSAGE_MOVED_METERS or Ui.FrontBlockingWidget() then return end
+            if retried then return end
+            retried = true
+            -- The game's own "Use" from the thing's menu finds ways the plain click does not.
+            ContextMenu.UseFirst(e.uuid, function(used, reason, entry)
+                if used then
+                    Speech.Say(L("using", { name = entry or e.name or "?" }), { interrupt = true })
+                else
+                    Speech.Say(L("could_not_activate", { label = e.name or "?", reason = L(reason or "reason_no_effect") }), { interrupt = true })
+                end
+            end)
+        end)
+    end
+    done = function(ok, reasonKey, detail)
         if not ok then
             local text = Travel.FailureText(e.name or "?", reasonKey, detail)
             if text then Speech.Say(text, { interrupt = true }) end
@@ -183,6 +238,17 @@ function PlaceList:Use(e)
             Speech.Say(L("arrived_at", { name = e.name or "?" }))
         end
         if e.afterUse then e.afterUse(e) end
+        if e.uuid and Entities.IsPassage(e.uuid) and not Entities.IsLadder(e.uuid) then checkPassage() end
+        if e.uuid and Entities.IsCharacter(e.uuid) and not Entities.IsDead(e.uuid) and not retried then
+            -- A talk click can be lost after a walk (Auntie Ethel in the grove: walked to, clicked,
+            -- nothing opened; the same click again started the conversation, 2026-09-25): when no
+            -- screen of the game's comes up, the click is made once more.
+            Timer.After(TALK_CHECK_MS, function()
+                if Ui.FrontBlockingWidget() or Combat.Current() or retried then return end
+                retried = true
+                Travel.Interact(e.uuid, function() end, e.position)
+            end)
+        end
     end
     -- A point with no character or object (a map marker) may lie where no way goes yet: the walk
     -- then ends as close as the ways allow.

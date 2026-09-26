@@ -27,10 +27,13 @@ end
 -- cancel key sent after it reached the game menu instead, verified 2026-09-25).
 local function build(screen, widgetName, at, afterAction, state)
     local out = {}
+    local title = nil
     for i, e in ipairs(ContextMenu.Read(widgetName)) do
         if e.title then
+            title = e.text
             out[#out + 1] = Controls.Text(e.text)
         else
+            local under = e.indented and title or nil -- "Enviar a" > "Gale"
             out[#out + 1] = Controls.Item({
                 kind = "button",
                 describe = function() return Strings.List({ e.text, not e.enabled and L("unavailable") }) end,
@@ -48,10 +51,17 @@ local function build(screen, widgetName, at, afterAction, state)
                         state.chosen = true
                         -- The game says what happened (its log); the parent list is read again,
                         -- unless the action opened a game window (Examinar), which speaks for itself.
+                        -- Some actions log nothing (an item sent to Gale moved silently,
+                        -- 2026-09-25): say what was done before the parent list's item.
                         Timer.After(READBACK_MS, function()
                             local opened = frontName() ~= before
-                            if #screen.levels > 0 then screen:Pop(opened) end
+                            if #screen.levels > 0 then screen:Pop(true) end
                             if afterAction and not opened then afterAction() end
+                            if not opened then
+                                local label = under and L("label_value", { label = under, value = e.text }) or e.text
+                                local c = screen.Current and screen:Current()
+                                Speech.Say(Strings.Sentences({ L("action_done", { label = label }), c and c.Describe() }), { interrupt = true })
+                            end
                         end)
                     end)
                 end,

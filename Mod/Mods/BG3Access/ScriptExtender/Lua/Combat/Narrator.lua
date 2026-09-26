@@ -11,6 +11,7 @@
 -- back: during a loading screen and for LOAD_QUIET_MS after it the log is only counted (measured:
 -- after the nautiloid's level change the game refilled the log with the old fight's entries).
 local CombatLog = Ext.Require("Game/CombatLog.lua")
+local CombatState = Ext.Require("Game/Combat.lua")
 local Player = Ext.Require("Game/Player.lua")
 local LogWords = Ext.Require("Combat/LogWords.lua")
 local Speech = Ext.Require("Core/Speech.lua")
@@ -91,11 +92,30 @@ end
 
 -- Barks are spoken by the speech.barks setting: "all", "party" (the party's own) or "none".
 -- Volo's song in the goblin camp was a line every few seconds over everything else (2026-09-24).
+-- A bark said again within BARK_REPEAT_MS is not spoken again (still in the History buffer): Volo
+-- sings his ten lines over and over, a new line every 5 s (goblin camp, 2026-09-25).
+local BARK_REPEAT_MS = 5 * 60 * 1000
+local barkSaidAt = {}
 local function barkWanted(e)
     local mode = Config.Get("speech.barks") or "all"
     if mode == "none" then return false end
-    if mode == "party" then return e.speaker ~= nil and Player.PartyNames()[e.speaker] == true end
+    if mode == "party" and not (e.speaker ~= nil and Player.PartyNames()[e.speaker] == true) then return false end
+    local now = Ext.Timer.MonotonicTime()
+    local last = barkSaidAt[e.text]
+    if last and now - last < BARK_REPEAT_MS then return false end
+    barkSaidAt[e.text] = now
     return true
+end
+
+-- Outside combat the same line again within BARK_REPEAT_MS is not spoken again either: a goblin
+-- throwing rocks for fun ("Skrut: Lanzar roca.") every few seconds by Minthara, 2026-09-25.
+local lineSaidAt = {}
+local function repeatedOutsideCombat(e)
+    if CombatState.Current() then return false end
+    local now = Ext.Timer.MonotonicTime()
+    local last = lineSaidAt[e.text]
+    lineSaidAt[e.text] = now
+    return last ~= nil and now - last < BARK_REPEAT_MS
 end
 
 local function take(e)
@@ -104,6 +124,7 @@ local function take(e)
         return
     end
     Buffers.Add("events", e.text)
+    if e.kind ~= "speech" and repeatedOutsideCombat(e) then return end
     Buffers.Add("combat", e.text)
     if not grouped() then
         Speech.Say(e.text)
@@ -139,7 +160,10 @@ local function readNew()
     end
     if count == seen then return end
     for _, e in ipairs(CombatLog.Entries(seen + 1)) do
-        if e.text and e.text ~= "" and not (recent[e.text] and now - recent[e.text] < REPEAT_MS) then take(e) end
+        -- Hits and misses repeat for real: Scorching Ray's two rays of 6 were said as one
+        -- (torture room, 2026-09-25).
+        local mayRepeat = e.kind == "damage" or e.kind == "miss"
+        if e.text and e.text ~= "" and (mayRepeat or not (recent[e.text] and now - recent[e.text] < REPEAT_MS)) then take(e) end
         if e.text then recent[e.text] = now end
     end
     for text, at in pairs(recent) do

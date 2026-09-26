@@ -20,13 +20,25 @@ function Picking.Hovered()
     return nil
 end
 
--- true when the entity with this UUID is under the cursor, as the hovered game object, item,
--- character or dead character.
+-- true when the entity with this UUID is under the cursor: the hovered game object, or the item,
+-- character or dead character when the game object is not another creature. With the cursor on
+-- Camorrista Gurd, Magic Missile's darts went to Zami Ojo Avizor on a ledge behind him (Zami was
+-- the GameObject, Gurd the Character field), 2026-09-25.
 function Picking.IsHovered(uuid)
     local ph = helper()
     local ok, hit = pcall(function()
         local inner = ph.Inner.Inner[1]
-        for _, e in ipairs({ inner.GameObject, inner.Item, inner.Character, inner.DeadCharacter }) do
+        local go = inner.GameObject
+        if go and go.Uuid then
+            if go.Uuid.EntityUuid == uuid then return true end
+            -- Another creature under the cursor is what the click would hit; anything else (the
+            -- ground, scenery) does not hide the item or character fields: a ladder's roots were
+            -- never found with GameObject alone (Blighted Village, 2026-09-25).
+            local isCharacter = false
+            pcall(function() isCharacter = go.ClientCharacter ~= nil end)
+            if isCharacter then return false end
+        end
+        for _, e in ipairs({ inner.Item, inner.Character, inner.DeadCharacter }) do
             if e and e.Uuid and e.Uuid.EntityUuid == uuid then return true end
         end
         return false

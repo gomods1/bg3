@@ -10,6 +10,7 @@
 -- climb".
 local Activate = Ext.Require("Game/Activate.lua")
 local Entities = Ext.Require("Game/Entities.lua")
+local Doors = Ext.Require("Game/Doors.lua")
 local Paths = Ext.Require("Game/Paths.lua")
 local SafeRoute = Ext.Require("Game/SafeRoute.lua")
 local Camera = Ext.Require("Game/Camera.lua")
@@ -90,6 +91,7 @@ local function follow(trip, onDone)
     -- is why (a burning wreck too wide to go round, 2026-09-24).
     local lastDanger = nil
     local ladders = 0
+    local steppedOffLadder, triedTactical = false, false
     local attempt
 
     -- Camera turns made for the current segment (a turn does not count as a segment).
@@ -157,19 +159,66 @@ local function follow(trip, onDone)
             local down = ladder and here and foot and here[2] > foot[2] + LADDER_TOP_ABOVE
             local key = (not ladder and "using_passage") or (down and "climbing_down") or "climbing"
             Speech.Say(Strings.Get(key, { name = Entities.Name(uuid) or Strings.Get(ladder and "kind_ladder" or "kind_passage") }))
-            Activate.WorldClick(uuid, function(used, err)
-                if used then
-                    Waits.UntilStopped(attempt, LADDER_STOPPED_MS)
-                elseif not turnCamera(info) then
-                    -- (A companion standing on the ladder's top hid it, in the sanctum: another
-                    -- view is tried first.)
-                    onDone(false, err)
-                else
-                    ladders = ladders - 1
-                end
-            end, ladder and (down and LADDER_DOWN_HEIGHTS or LADDER_HEIGHTS) or nil)
+            local heights = ladder and (down and LADDER_DOWN_HEIGHTS or LADDER_HEIGHTS) or nil
+            local function clickIt()
+                Activate.WorldClick(uuid, function(used, err)
+                    if used then
+                        Waits.UntilStopped(attempt, LADDER_STOPPED_MS)
+                    elseif down and not steppedOffLadder then
+                        -- On the ladder's top the character's own body is what the cursor finds
+                        -- (Gale on the "Raíces nudosas" in the Blighted Village: four views, no
+                        -- aim, 2026-09-25): a step back, then the ladder at once from there (a
+                        -- walk back to the top met the same body).
+                        steppedOffLadder = true
+                        Travel.StepBack(function() clickIt() end)
+                    elseif down and not triedTactical then
+                        -- Down a cliff the rungs hide below the edge from the usual camera: the
+                        -- game's tactical camera looks straight down (put back after the click).
+                        triedTactical = true
+                        Camera.SetTactical(true, function(changed)
+                            if not changed then clickIt() return end
+                            Activate.WorldClick(uuid, function(used2, err2)
+                                Camera.SetTactical(false, function()
+                                    if used2 then Waits.UntilStopped(attempt, LADDER_STOPPED_MS) else onDone(false, err2) end
+                                end)
+                            end, heights)
+                        end)
+                    elseif not turnCamera(info) then
+                        -- (A companion standing on the ladder's top hid it, in the sanctum: another
+                        -- view is tried first.)
+                        onDone(false, err)
+                    else
+                        ladders = ladders - 1
+                    end
+                end, heights)
+            end
+            clickIt()
             return
         end
+        if not points and why == "door_to_open" and opened < MAX_OPENS then
+            -- The shut door on the only way, within reach: tried like any door on the way.
+            local door = detail.doorUuid
+            if door == trip.uuid then
+                -- The door is where the trip goes: its own use is the one click (a second would
+                -- shut it again).
+                trip.finish(function(done, ok, reason)
+                    if done then onDone(ok, reason) else onDone(false, reason or "reason_door_closed", detail) end
+                end)
+                return
+            end
+            opened = opened + 1
+            lastStart = nil
+            Speech.Say(Strings.Get("using_on_the_way", { name = Entities.Name(door) or "?" }))
+            Activate.WorldClick(door, function(used, err)
+                if not used then
+                    onDone(false, err)
+                    return
+                end
+                Waits.WhenDoorOpen(door, function() Waits.UntilStopped(attempt) end)
+            end)
+            return
+        end
+        if not points and why == "door_to_open" then why = "reason_door_closed" end
         if not points then
             Bridge.Log(string.format("travel: no point to click (%s, %.1f m of route on screen, %d camera turns)", tostring(why),
                 info and info.visibleMeters or -1, turnsDone()))
@@ -212,19 +261,30 @@ local function follow(trip, onDone)
             elseif blocker and blocker.uuid ~= trip.uuid and opened < MAX_OPENS then
                 -- Something stands on the way (a closed door, measured on the nautiloid): use it,
                 -- as a player clicks a door to open it, then go on.
-                opened = opened + 1
-                Speech.Say(Strings.Get("using_on_the_way", { name = Entities.Name(blocker.uuid) or "?" }))
-                Activate.ObjectClickAt(blocker.point, blocker.uuid, function(used, err)
-                    if not used then
-                        onDone(false, err)
-                    elseif Entities.IsDoor(blocker.uuid) then
-                        -- A door takes a moment to open; looking again too soon found it still
-                        -- closed and the second click shut it (the nautiloid's first Esfínter,
-                        -- 2026-09-24): wait until the game reports it open.
-                        Waits.WhenDoorOpen(blocker.uuid, function() Waits.UntilStopped(attempt) end)
-                    else
-                        Waits.UntilStopped(attempt)
-                    end
+                local function use()
+                    opened = opened + 1
+                    Speech.Say(Strings.Get("using_on_the_way", { name = Entities.Name(blocker.uuid) or "?" }))
+                    Activate.ObjectClickAt(blocker.point, blocker.uuid, function(used, err)
+                        if not used then
+                            onDone(false, err)
+                        elseif Entities.IsDoor(blocker.uuid) then
+                            -- A door takes a moment to open; looking again too soon found it still
+                            -- closed and the second click shut it (the nautiloid's first Esfínter,
+                            -- 2026-09-24): wait until the game reports it open.
+                            Waits.WhenDoorOpen(blocker.uuid, function() Waits.UntilStopped(attempt) end)
+                        else
+                            Waits.UntilStopped(attempt)
+                        end
+                    end)
+                end
+                if not Entities.IsDoor(blocker.uuid) then use() return end
+                -- An open door's leaf can stand on the clicked ground: clicking it shut the door
+                -- it had just opened ("Abriendo Puerta" twice, Shadowheart left in front of a
+                -- closed door, the Sanctum, 2026-09-25). An open door is looked past instead.
+                Doors.States({ blocker.uuid }, function(states)
+                    local st = states[blocker.uuid]
+                    if not (st and st.opened) then use() return end
+                    if not turnCamera(info) then onDone(false, "reason_on_object", { blocker = Entities.Name(blocker.uuid) }) end
                 end)
             elseif (reason == "reason_no_cursor" or (reason == "reason_on_object" and not blocker))
                 and turnCamera(info) then
@@ -345,6 +405,7 @@ end
 -- either side.
 local STEP_BACK_NEAR = 1.8
 local TURN_NEAR = 8.0 -- meters: a target this close that cannot be clicked is first looked at
+local SIDE_VIEW_NEAR = 3.0 -- meters: this close, it is looked at from the side
 local STEP_BACK_METERS = 2.5
 
 local function stepBackPoints(me)
@@ -378,6 +439,16 @@ function Travel.StepAwayFrom(uuid, onDone)
         onDone(false)
         return
     end
+    stepToFirst(stepBackPoints(me), function(stepped)
+        if stepped then Waits.UntilStopped(function() onDone(true) end) else onDone(false) end
+    end)
+end
+
+-- A step back from where the controlled character stands (toward the camera, else aside).
+-- onDone(stepped).
+function Travel.StepBack(onDone)
+    local me = Entities.Position(Entities.Controlled())
+    if not me then onDone(false) return end
     stepToFirst(stepBackPoints(me), function(stepped)
         if stepped then Waits.UntilStopped(function() onDone(true) end) else onDone(false) end
     end)
@@ -424,7 +495,14 @@ function Travel.Interact(uuid, onDone, knownPosition)
                 -- toward it first (Gale 2 m behind Tav: walking toward a companion who follows
                 -- took 100 s of steps and camera turns, 2026-09-24).
                 turned = true
-                Camera.TurnToward(target[1] - me[1], target[3] - me[3], function() click(cb) end)
+                local dx, dz = target[1] - me[1], target[3] - me[3]
+                if Entities.Distance(me, target) < SIDE_VIEW_NEAR then
+                    -- Right next to the character, a view along the line from it to the target
+                    -- keeps its body in front: look from the side (Priestess Gut 2 m ahead of
+                    -- Tav, hidden behind him from both views, 2026-09-25).
+                    dx, dz = -dz, dx
+                end
+                Camera.TurnToward(dx, dz, function() click(cb) end)
                 return
             end
             if not ok and not steppedBack and me and target and Entities.Distance(me, target) < STEP_BACK_NEAR then

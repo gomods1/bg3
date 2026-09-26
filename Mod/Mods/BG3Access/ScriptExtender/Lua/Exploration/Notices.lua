@@ -11,6 +11,7 @@ local Player = Ext.Require("Game/Player.lua")
 local TutorialHints = Ext.Require("Screens/TutorialHints.lua")
 local Speech = Ext.Require("Core/Speech.lua")
 local Strings = Ext.Require("Core/Strings.lua")
+local Hotbar = Ext.Require("Game/Hotbar.lua")
 local Bridge = Ext.Require("Core/Bridge.lua")
 local Log = Ext.Require("Core/Log.lua")
 
@@ -21,6 +22,8 @@ local Notices = {}
 local POLL_MS = 250
 local REPEAT_MS = 15000
 local lastText, lastTextAt = nil, 0
+local areaEnteredAt = -1e9
+local AREA_BANNER_MS = 30000
 
 local lastKey, lastArea, lastLevelUps = nil, nil, ""
 local sideTutorials = {} -- keys of the side tutorials already shown
@@ -78,6 +81,17 @@ local function pollGroups()
     lastGroups = key
 end
 
+-- Why the controlled character cannot act (Game/Hotbar.CapabilityMessages), said when it
+-- appears or changes.
+local lastCapabilities = ""
+local function pollCapabilities()
+    local texts = Hotbar.CapabilityMessages()
+    if not texts then return end
+    local key = table.concat(texts, "|")
+    if key ~= lastCapabilities and #texts > 0 then Speech.Event(Strings.List(texts)) end
+    lastCapabilities = key
+end
+
 local function poll()
     local n = Notification.Read()
     local key = n and (tostring(n.type) .. "|" .. table.concat(n.parts, "|")) or nil
@@ -98,12 +112,19 @@ local function poll()
         -- The same banner can come back right after (measured: "Diario actualizado" twice); an
         -- area's banner is its name, said below as the area entered ("Aldea marchita" and "Zona:
         -- Aldea marchita" came together, 2026-09-25).
-        local areaBanner = area and area ~= lastArea and text == area
-        if not areaBanner and (text ~= lastText or now - lastTextAt > REPEAT_MS) then Speech.Event(text) end
+        -- The region banner can also come seconds after the area changed ("Zona: Campamento",
+        -- then the banner 7 s later), and the game sends each banner again with Type None
+        -- ("Region|Campamento", then "None|Campamento" 16 s later, 2026-09-25).
+        local areaBanner = area and text == area and (area ~= lastArea or now - areaEnteredAt < AREA_BANNER_MS)
+        local resent = n.type == "None" and text == lastText
+        if not areaBanner and not resent and (text ~= lastText or now - lastTextAt > REPEAT_MS) then Speech.Event(text) end
         lastText, lastTextAt = text, now
     end
     lastKey = key or lastKey
-    if area and area ~= lastArea then Speech.Event(L("entering_area", { name = area })) end
+    if area and area ~= lastArea then
+        Speech.Event(L("entering_area", { name = area }))
+        areaEnteredAt = Ext.Timer.MonotonicTime()
+    end
     lastArea = area or lastArea
     local seenNow = {}
     for _, t in ipairs(Notification.SideTutorials()) do
@@ -124,6 +145,7 @@ local function poll()
     lastLevelUps = upsKey
     pollTalk()
     pollGroups()
+    pollCapabilities()
 end
 
 -- "Playa arrasada", for the where-am-I command.

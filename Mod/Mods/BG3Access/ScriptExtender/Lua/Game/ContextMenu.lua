@@ -10,6 +10,7 @@
 local Ui = Ext.Require("Game/Ui.lua")
 local Vm = Ext.Require("Game/Vm.lua")
 local Activate = Ext.Require("Game/Activate.lua")
+local Timer = Ext.Require("Core/Timer.lua")
 local Input = Ext.Require("Game/Input.lua")
 
 local ContextMenu = {}
@@ -88,6 +89,39 @@ function ContextMenu.Click(widgetName, index, at, onDone)
         return
     end
     Activate.ClickListItem(function() return entryElements(openMenu(widgetName)) end, index, firstEntry(menu, at), onDone)
+end
+
+-- The world context menu's first usable entry on thing uuid, chosen as a player does (a verified
+-- right click, then a verified click on the entry). The entries arrive a few frames after the menu
+-- opens. onDone(ok, reasonKey, entryText). Used where the game's plain click fails: the worg
+-- pens' entrance from inside the Shattered Sanctum answered a left click with "No puedes llegar",
+-- while its menu's "Usar (Tav)" walked Tav 120 m round and went in (2026-09-25).
+local WORLD_MENU = "WorldContextMenu"
+local ENTRIES_WAIT_MS, ENTRIES_POLL_MS = 2000, 100
+function ContextMenu.UseFirst(uuid, onDone)
+    Activate.ContextClick(uuid, function(ok, reason, fx, fy)
+        if not ok then
+            onDone(false, reason)
+            return
+        end
+        local waited = 0
+        local function pick()
+            for i, entry in ipairs(ContextMenu.Read(WORLD_MENU)) do
+                if entry.enabled and not entry.title then
+                    ContextMenu.Click(WORLD_MENU, i, { fx, fy }, function(clicked, why) onDone(clicked, why, entry.text) end)
+                    return
+                end
+            end
+            waited = waited + ENTRIES_POLL_MS
+            if waited >= ENTRIES_WAIT_MS then
+                ContextMenu.Close(WORLD_MENU)
+                onDone(false, "reason_unavailable")
+                return
+            end
+            Timer.After(ENTRIES_POLL_MS, pick)
+        end
+        Timer.After(ENTRIES_POLL_MS, pick)
+    end)
 end
 
 -- Closes the open menu with the game's cancel key.
