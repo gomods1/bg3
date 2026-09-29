@@ -142,6 +142,12 @@ Tick only what was verified in the running game. Status detail lives in `STATUS.
   game's reason; slow aims say the camera is turning; damage to things named right
 - [ ] Opportunity-attack warning before walking to a thing in combat (built, not yet heard);
   faster aiming at targets on ledges
+- [x] Party list (mod menu): the party in F1-F4 order with HP, statuses, distance; Enter takes
+  control (verified out of combat); the switch after the player's own key is said at once
+- [ ] Targeting opens on the target confirmed last in the same fight (built, untested: the worg
+  pens replay could not aim at Birka from the entrance); targeting lists rank enemies, other
+  characters, the party, then objects (verified out of combat at the worg pens entrance: the ten
+  characters first, 94 objects after; in a fight untested)
 ## M6 Inventory and progression
 - [x] Character panel: inventory (use/equip), equipment, sheet
 - [x] Level up: features, HP, resources, subclass list, spell choices (verified grid clicks), Accept

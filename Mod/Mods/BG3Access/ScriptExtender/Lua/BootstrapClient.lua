@@ -65,6 +65,7 @@ BG3Access.Watchers = Ext.Require("Game/Watchers.lua")
 BG3Access.LogWords = Ext.Require("Combat/LogWords.lua")
 BG3Access.Interactables = Ext.Require("Game/Interactables.lua")
 BG3Access.Commands = Ext.Require("Core/Commands.lua")
+BG3Access.Poll = Ext.Require("Core/Poll.lua") -- Poll.Report(): what each poller costs
 BG3Access.Spells = Ext.Require("Game/Spells.lua")
 BG3Access.Input = Ext.Require("Game/Input.lua")
 BG3Access.Reactions = Ext.Require("Game/Reactions.lua")

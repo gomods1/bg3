@@ -128,13 +128,28 @@ function Entities.Health(uuid)
     return nil
 end
 
--- Whether character uuid has status id (the client's StatusContainer: status entity -> id).
+-- Whether a status stat belongs to group ("SG_Rage": every rage status; its StatusGroups field).
+local function inGroup(status, group)
+    local ok, stat = pcall(Ext.Stats.Get, status)
+    if not ok or not stat then return false end
+    local found = false
+    pcall(function()
+        for _, g in ipairs(stat.StatusGroups or {}) do
+            if tostring(g) == group then found = true end
+        end
+    end)
+    return found
+end
+
+-- Whether character uuid has status id (the client's StatusContainer: status entity -> id), or
+-- any status of a group when id is one ("SG_Rage").
 function Entities.HasStatus(uuid, id)
     local e = uuid and Entities.Get(uuid)
+    local group = id:sub(1, 3) == "SG_"
     local found = false
     pcall(function()
         for _, name in pairs(e.StatusContainer.Statuses) do
-            if name == id then found = true end
+            if name == id or (group and inGroup(name, id)) then found = true end
         end
     end)
     return found

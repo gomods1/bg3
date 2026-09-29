@@ -6,6 +6,7 @@
 -- Queued events, recorded in the Events buffer. What is already there when the mod starts or a
 -- save loads is not read back, except the "!" (it stays until the talk: a sighted player sees it).
 local Notification = Ext.Require("Game/Notification.lua")
+local Ui = Ext.Require("Game/Ui.lua")
 local Entities = Ext.Require("Game/Entities.lua")
 local Player = Ext.Require("Game/Player.lua")
 local TutorialHints = Ext.Require("Screens/TutorialHints.lua")
@@ -13,7 +14,7 @@ local Speech = Ext.Require("Core/Speech.lua")
 local Strings = Ext.Require("Core/Strings.lua")
 local Hotbar = Ext.Require("Game/Hotbar.lua")
 local Bridge = Ext.Require("Core/Bridge.lua")
-local Log = Ext.Require("Core/Log.lua")
+local Poll = Ext.Require("Core/Poll.lua")
 
 local L = Strings.Get
 
@@ -28,11 +29,14 @@ local AREA_BANNER_MS = 30000
 local lastKey, lastArea, lastLevelUps = nil, nil, ""
 local sideTutorials = {} -- keys of the side tutorials already shown
 local started = false
-local startedAt = 0
+local settleUntil = 0
 -- The view model is refilled a moment after a load: the save's last banner ("¡Guardado rápido
--- completado!") appeared after the first poll and was read on every quick load (2026-09-24).
--- Banners during this long after the start only set the baseline.
+-- completado!") appeared after the first poll and was read on every quick load (2026-09-24), and
+-- a save loaded from another game brought the old game's banner ("Diario actualizado, Escapa del
+-- nautiloide" on loading the Blighted Village, 2026-09-26). Banners during this long after the
+-- start, and after every loading screen, only set the baseline.
 local SETTLE_MS = 5000
+local LOADING_SCREEN = "root"
 local TALK_RADIUS = 40      -- meters around the controlled character
 local TALK_POLL_MS = 1000
 local lastTalkPoll = 0
@@ -96,14 +100,16 @@ local function poll()
     local n = Notification.Read()
     local key = n and (tostring(n.type) .. "|" .. table.concat(n.parts, "|")) or nil
     local area = Notification.AreaName()
+    local front = Ui.FrontWidget()
+    if front and front.name == LOADING_SCREEN then settleUntil = Ext.Timer.MonotonicTime() + SETTLE_MS end
     if not started then
         lastKey, lastArea, started = key, area, true
-        startedAt = Ext.Timer.MonotonicTime()
+        settleUntil = Ext.Timer.MonotonicTime() + SETTLE_MS
         lastLevelUps = table.concat(Notification.LevelUps(), ",")
         for _, t in ipairs(Notification.SideTutorials()) do sideTutorials[t.key] = true end
         return
     end
-    if key and key ~= lastKey and Ext.Timer.MonotonicTime() - startedAt < SETTLE_MS then
+    if key and key ~= lastKey and Ext.Timer.MonotonicTime() < settleUntil then
         lastKey = key
     elseif key and key ~= lastKey and #n.parts > 0 then
         Bridge.Log("notification: " .. key)
@@ -155,13 +161,7 @@ function Notices.WhereAmI()
 end
 
 function Notices.Start()
-    local lastPoll = 0
-    Ext.Events.Tick:Subscribe(function()
-        local now = Ext.Timer.MonotonicTime()
-        if now - lastPoll < POLL_MS then return end
-        lastPoll = now
-        Log.Guard("notices", poll)
-    end)
+    Poll.Every("notices", POLL_MS, poll)
 end
 
 return Notices

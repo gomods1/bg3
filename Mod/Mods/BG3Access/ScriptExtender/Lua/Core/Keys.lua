@@ -13,6 +13,10 @@ local Config = Ext.Require("Core/Config.lua")
 local Keys = {}
 
 Keys.Router = nil -- function(combo) -> handled
+-- function(combo): told of every press the mod let through to the game (no return value). The
+-- combat tracker uses it to know that a change of the controlled character came from the player's
+-- own key (F1-F4, [ ]) and to say it at once.
+Keys.Observer = nil
 
 local actions = {}  -- id -> fn
 local order = {}    -- ids in registration order (help lists them in this order)
@@ -99,10 +103,12 @@ local function onKey(e)
         if ok and handled then
             e:PreventAction()
             claimed[key] = true
+            return
         elseif not ok then
             Log.Error("router key " .. combo .. ": " .. tostring(handled))
         end
     end
+    if Keys.Observer and not e.Repeat then Log.Guard("key observer " .. combo, Keys.Observer, combo) end
 end
 
 function Keys.Start()

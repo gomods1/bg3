@@ -45,6 +45,12 @@ function Difficulty:Tick()
     end
 end
 
+-- Left/Right are the game's own: they turn its preset carousel (the list moves with Up/Down).
+function Difficulty:OnKey(combo)
+    if combo == "LEFT" or combo == "RIGHT" then return false end
+    return ListScreen.OnKey(self, combo)
+end
+
 function Difficulty:Help()
     local lines = Generic.Help(self)
     table.insert(lines, 1, L("help_difficulty"))

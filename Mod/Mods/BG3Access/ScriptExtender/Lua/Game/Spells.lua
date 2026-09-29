@@ -58,6 +58,45 @@ function Spells.Info(id)
     return info
 end
 
+-- "only" when the spell can only be used in combat (Rage), "never" when never in combat (Arcane
+-- Recovery), nil otherwise: the stat's Requirements entry "Combat" with its Not flag.
+function Spells.CombatRule(id)
+    local ok, stat = pcall(Ext.Stats.Get, id)
+    if not ok or not stat then return nil end
+    local rule = nil
+    pcall(function()
+        for _, r in ipairs(stat.Requirements or {}) do
+            if tostring(r.Requirement) == "Combat" then rule = r.Not and "never" or "only" end
+        end
+    end)
+    return rule
+end
+
+-- Statuses (or status groups, "SG_Rage") the spell's RequirementConditions ask the caster to have:
+-- the plain HasStatus('X') terms not negated ("HasStatus('SG_Rage') and ..." for Ferocious
+-- Appetite, verified 2026-09-26). Terms with a second argument (another target) are left out.
+function Spells.RequiredStatuses(id)
+    local ok, stat = pcall(Ext.Stats.Get, id)
+    if not ok or not stat then return {} end
+    local text = ""
+    pcall(function() text = tostring(stat.RequirementConditions or "") end)
+    local out = {}
+    for before, name in text:gmatch("(%a*)%s*HasStatus%('([%w_]+)'%)") do
+        if before ~= "not" then out[#out + 1] = name end
+    end
+    return out
+end
+
+-- Whether the spell may target its own caster: its TargetConditions do not say "not Self()"
+-- (Lesser Restoration may, Magic Missile and weapon attacks may not). Unknown spells: false.
+function Spells.CanTargetSelf(id)
+    local ok, stat = pcall(Ext.Stats.Get, id or "")
+    if not ok or not stat then return false end
+    local text = ""
+    pcall(function() text = tostring(stat.TargetConditions or "") end)
+    return not text:find("not%s+Self%(%)")
+end
+
 -- Spell stat id for a display-name handle (view models such as ls.VMSpellReference carry only the
 -- name: Spell.Name, Level). Several stats share a name (Zone_BurningHands, Zone_BurningHands_4
 -- upcast variants, item and monster copies); the base spell comes first in GetStats order

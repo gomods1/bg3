@@ -1,8 +1,9 @@
 -- "Nearby" list (gate.md 8.3, mod menu): what the game's own highlight shows (Game/Highlights),
 -- plus doors (Game/Doors: the highlight does not show them) with their open/closed/locked state,
 -- plus the other things a sighted player could click that the highlight leaves out (scenery,
--- characters: Game/Interactables). Left/Right show one category at a time (characters,
--- containers, loot, doors, other), skipping empty ones. Enter walks there and uses it like a click (Exploration/Travel): talk,
+-- characters: Game/Interactables). Sections (NAVIGATION.md, Tab / Shift+Tab): everything nearest
+-- first, then one per kind (characters, containers, loot, doors, traps, other), empty ones left out.
+-- Enter walks there and uses it like a click (Exploration/Travel): talk,
 -- open, loot, open or close a door. TODO: make sure hidden (secret) doors are not listed before
 -- the party found them.
 local Entities = Ext.Require("Game/Entities.lua")
@@ -158,16 +159,7 @@ function Nearby.New(entries, onClose, open, far)
     local self = setmetatable(PlaceList.New("(nearby)", L(far and "screen_farther" or "screen_nearby"), entries, onClose, open), Nearby)
     self.baseTitle = far and "screen_farther" or "screen_nearby"
     self.all = self.entries
-    self.category = 1
     return self
-end
-
-local function countIn(all, category)
-    local n = 0
-    for _, e in ipairs(all) do
-        if category == "all" or e.category == category then n = n + 1 end
-    end
-    return n
 end
 
 -- In the "all" view, scenery that repeats (a dozen candles and braziers in the goblin sanctum,
@@ -196,37 +188,27 @@ local function groupedScenery(entries)
     return out
 end
 
+-- One section per kind with something in it, "all" first (repeated scenery grouped there).
 function Nearby:Build()
-    local name = CATEGORIES[self.category]
-    local shown = {}
-    for _, e in ipairs(self.all) do
-        if name == "all" or e.category == name then shown[#shown + 1] = e end
-    end
-    if name == "all" then shown = groupedScenery(shown) end
-    self.entries = shown
-    self.title = name == "all" and L(self.baseTitle) or L("screen_nearby_category", { list = L(self.baseTitle), category = L("category_" .. name) })
-    return PlaceList.Build(self)
-end
-
--- Left/Right: the next category with something in it.
-function Nearby:SwitchCategory(step)
-    for k = 1, #CATEGORIES - 1 do
-        local i = ((self.category - 1 + step * k) % #CATEGORIES) + 1
-        if countIn(self.all, CATEGORIES[i]) > 0 then
-            self.category = i
-            self.index = 0
-            self:Refresh()
-            Speech.Say(self:Summary(), { interrupt = true })
-            return
+    local out = {}
+    for _, name in ipairs(CATEGORIES) do
+        local shown = {}
+        for _, e in ipairs(self.all) do
+            if name == "all" or e.category == name then shown[#shown + 1] = e end
+        end
+        if name == "all" then shown = groupedScenery(shown) end
+        if #shown > 0 then
+            self.entries = shown
+            local section = L("category_" .. name)
+            for _, c in ipairs(PlaceList.Build(self)) do
+                c.section = section
+                out[#out + 1] = c
+            end
         end
     end
-    Speech.Say(L("nearby_one_category"), { interrupt = true })
-end
-
-function Nearby:OnKey(combo)
-    if combo == "LEFT" then self:SwitchCategory(-1) return true end
-    if combo == "RIGHT" then self:SwitchCategory(1) return true end
-    return PlaceList.OnKey(self, combo)
+    self.entries = self.all
+    self.title = L(self.baseTitle)
+    return out
 end
 
 function Nearby:Help()

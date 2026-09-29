@@ -25,6 +25,7 @@ local DEFAULTS = {
         markers = "",
         status = "",
         turnOrder = "",
+        party = "",
         actions = "",
         move = "",
         history = "",

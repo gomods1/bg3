@@ -10,7 +10,7 @@ local Words = Ext.Require("Combat/Words.lua")
 local Narrator = Ext.Require("Combat/Narrator.lua")
 local Speech = Ext.Require("Core/Speech.lua")
 local Strings = Ext.Require("Core/Strings.lua")
-local Log = Ext.Require("Core/Log.lua")
+local Poll = Ext.Require("Core/Poll.lua")
 
 local L = Strings.Get
 
@@ -19,18 +19,28 @@ local Tracker = {}
 local POLL_MS = 200
 local END_DELAY_MS = 600
 
-local state = { combat = nil, turnKey = nil, selected = nil, switchAt = nil, turnAt = 0 }
+local state = { combat = nil, turnKey = nil, selected = nil, switchAt = nil, turnAt = 0, expectUntil = 0 }
 
 -- The game selects a party member itself when the party's turn starts; the turn line already says
--- who it is, so a switch within SWITCH_QUIET_MS of a turn line is not announced separately.
+-- who it is, so a switch within SWITCH_QUIET_MS of a turn line is not announced separately. A
+-- switch the player asked for (a key let through to the game, the party list) is said at once.
 local SWITCH_QUIET_MS = 800
+local EXPECT_MS = 1500
+
+-- The player just did something that may change the controlled character (pressed a key the mod
+-- let through, chose one in the party list): the next switch is said without the quiet wait.
+function Tracker.ExpectSwitch()
+    state.expectUntil = Ext.Timer.MonotonicTime() + EXPECT_MS
+end
 
 local function pollSelected(now)
     local vm = Player.SelectedCharacter()
     local me = vm and Characters.Snapshot(vm)
     local uuid = me and me.uuid
     if not uuid then return end -- loading, menus: keep the last one (no announcement on return)
-    if state.selected and uuid ~= state.selected then state.switchAt = now end
+    if state.selected and uuid ~= state.selected then
+        state.switchAt = now < state.expectUntil and now - SWITCH_QUIET_MS or now
+    end
     state.selected = uuid
     if state.switchAt and now - state.switchAt >= SWITCH_QUIET_MS then
         state.switchAt = nil
@@ -94,13 +104,7 @@ local function poll()
 end
 
 function Tracker.Start()
-    local last = 0
-    Ext.Events.Tick:Subscribe(function()
-        local now = Ext.Timer.MonotonicTime()
-        if now - last < POLL_MS then return end
-        last = now
-        Log.Guard("combat tracker", poll)
-    end)
+    Poll.Every("combat tracker", POLL_MS, poll)
 end
 
 return Tracker

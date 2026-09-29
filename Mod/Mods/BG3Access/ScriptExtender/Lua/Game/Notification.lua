@@ -65,10 +65,19 @@ function Notification.Read()
     -- Some messages are templates themselves ("[1] actualizaciones nuevas disponibles en el diario",
     -- 2026-09-24): [1] is the notification's Amount when it has one; an unfilled slot is dropped
     -- rather than spoken as "[1]" (the count was not readable after the fact: Amount 0).
+    -- "Has usado: [1]." after a lock was picked with thieves' tools (2026-09-26): no Amount, and
+    -- the item is not in the view model. The banner as shown is taken then; without it the line
+    -- is left out ("Has usado: ." said nothing; the combat log names the tools).
     local amount = Vm.Get(n, "Amount")
     local message = Vm.Text(Vm.Get(n, "Message"), "Text")
     if message then
-        message = Text.Clean((message:gsub("%[1%]", (amount and amount > 0) and tostring(amount) or ""):gsub("%[%d+%]", "")))
+        local hasAmount = amount and amount > 0
+        local prefix = Text.Clean((message:match("^(.-)%[%d+%]") or ""))
+        if message:find("%[%d+%]") and not hasAmount and prefix ~= "" then
+            message = shownStartingWith(prefix)
+        else
+            message = Text.Clean((message:gsub("%[1%]", hasAmount and tostring(amount) or ""):gsub("%[%d+%]", "")))
+        end
     end
     add(message)
     add(render(Vm.Get(n, "ExtendedMessage")))

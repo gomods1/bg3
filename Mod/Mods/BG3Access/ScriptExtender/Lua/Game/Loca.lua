@@ -26,4 +26,14 @@ function Loca.Enum(template, value)
     return handle and Loca.Text(handle) or nil
 end
 
+-- A stat's DisplayName (a status, a passive, a spell: "RAGE_TOTEM_BEAR" -> "Furia: corazón de oso"),
+-- or nil.
+function Loca.StatName(id)
+    local ok, stat = pcall(Ext.Stats.Get, id)
+    if not ok or not stat then return nil end
+    local handle = nil
+    pcall(function() handle = stat.DisplayName end)
+    return Loca.Text(handle)
+end
+
 return Loca

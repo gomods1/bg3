@@ -117,7 +117,7 @@ local function follow(trip, onDone)
         return true
     end
 
-    local centeredAt = nil
+    local centeredAt, unblockedAt = nil, nil
     local function step(lastReason)
         segments = segments + 1
         local me, target = Entities.Controlled(), trip.target()
@@ -132,6 +132,17 @@ local function follow(trip, onDone)
             lastStart = nil
             cameraMoved = true
             Camera.CenterOn(here, function() attempt() end)
+            return
+        end
+        -- The camera pressed against a rock beside the character (2.4 m away, the screen full of
+        -- boulder, every ground click refused: Blighted Village, 2026-09-26): stand it back first.
+        local close = here and not Camera.IsTactical() and Camera.Distance(here)
+        if close and close < Camera.CLOSE_METERS and unblockedAt ~= segments then
+            unblockedAt = segments
+            segments = segments - 1
+            lastStart = nil
+            cameraMoved = true
+            Camera.Unblock(here, function() attempt() end)
             return
         end
         if segments > MAX_SEGMENTS or not target then

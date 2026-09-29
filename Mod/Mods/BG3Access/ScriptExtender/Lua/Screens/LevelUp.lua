@@ -21,6 +21,133 @@ local Choices = Ext.Require("Screens/Choices.lua")
 local L = Strings.Get
 
 local LevelUp = ListScreen.Extend()
+
+-- Feats ------------------------------------------------------------------------------------
+-- The feat list as Choices shows it: an unavailable feat says why (the game's unmet
+-- requirements, or already taken).
+local featSource = {
+    list = function()
+        local out = {}
+        for i, c in ipairs(Game.Feat.list()) do
+            c.reason = c.taken and L("feat_taken") or (#c.unmet > 0 and Strings.List(c.unmet)) or nil
+            out[i] = c
+        end
+        return out
+    end,
+    current = function() return Game.Feat.current() end,
+    select = function(i)
+        local c = Game.Feat.list()[i]
+        return c ~= nil and c.available and Game.Feat.select(i)
+    end,
+}
+
+local function abilityLine(i)
+    local a = Game.FeatAbilities()
+    local row = a and a.list[i]
+    if not row then return L("option_gone") end
+    return Strings.List({
+        L("level_up_feat_ability", { name = row.name, value = math.floor((row.value or 0) + 0.5) }),
+        (row.improvement or 0) > 0 and L("level_up_feat_plus", { n = row.improvement }),
+    })
+end
+
+local function pointsLine()
+    local a = Game.FeatAbilities()
+    if not a then return nil end
+    return L(a.chosen >= a.max and "spell_choice_done" or "spell_choice", { title = L("level_up_feat_points"), chosen = a.chosen, max = a.max })
+end
+
+local function buildFeatAbilities()
+    local out = {}
+    local a = Game.FeatAbilities()
+    for i = 1, a and #a.list or 0 do
+        out[#out + 1] = Controls.Item({
+            kind = "option",
+            describe = function() return abilityLine(i) end,
+            change = function(delta)
+                if not Game.ChangeFeatAbility(i, delta) then
+                    Speech.Say(L("cannot_change"), { interrupt = true })
+                    return
+                end
+                Controls.SayLater(function() return Strings.Sentences({ abilityLine(i), pointsLine() }) end)
+            end,
+        })
+    end
+    return out
+end
+
+local function skillLine(i)
+    local g = Game.FeatSkills()
+    local sk = g and g.list[i]
+    if not sk then return L("option_gone") end
+    -- Selected and disabled: a skill the character already has (Tav's Athletics, verified
+    -- 2026-09-26 with Skilled, whose three picks the game preselects).
+    local had = sk.proficient or (sk.selected and not sk.enabled)
+    local state = had and L("cc_proficient") or (sk.selected and L("selected")) or L("not_selected")
+    return Strings.List({ L("cc_skill", { name = sk.name, ability = sk.ability or "?", state = state }), not sk.enabled and not had and L("unavailable") })
+end
+
+local function skillsLine()
+    local g = Game.FeatSkills()
+    if not g then return nil end
+    return L(g.chosen >= g.max and "spell_choice_done" or "spell_choice", { title = L("level_up_feat_skills"), chosen = g.chosen, max = g.max })
+end
+
+local function buildFeatSkills()
+    local out = {}
+    local g = Game.FeatSkills()
+    for i, sk in ipairs(g and g.list or {}) do
+        if sk.enabled or sk.selected then
+            out[#out + 1] = Controls.Item({
+                kind = "option",
+                describe = function() return skillLine(i) end,
+                activate = function()
+                    if not Game.ToggleFeatSkill(i) then
+                        Speech.Say(L("cannot_change"), { interrupt = true })
+                        return
+                    end
+                    Controls.SayLater(function() return Strings.Sentences({ skillLine(i), skillsLine() }) end)
+                end,
+            })
+        end
+    end
+    return out
+end
+
+-- The feat section and, once a feat is chosen, what it asks for: ability points, skills,
+-- passives, spells.
+local function featControls(self)
+    local out = {}
+    if #Game.Feat.list() == 0 then return out end
+    local section = Choices.Section(self, L("level_up_feat"), featSource)
+    local open = section.Activate
+    section.Activate = function(...)
+        Game.ShowFeatTab() -- the game's own feat panel, as a player opens it
+        return open(...)
+    end
+    out[#out + 1] = section
+    if Game.FeatAbilities() then
+        out[#out + 1] = Controls.Item({
+            kind = "button",
+            describe = pointsLine,
+            activate = function() self:Push(L("level_up_feat_points"), buildFeatAbilities) end,
+        })
+    end
+    if Game.FeatSkills() then
+        out[#out + 1] = Controls.Item({
+            kind = "button",
+            describe = skillsLine,
+            activate = function() self:Push(L("level_up_feat_skills"), buildFeatSkills) end,
+        })
+    end
+    for i = 1, #PassiveChoices.Read(Game.FeatPassives) do
+        out[#out + 1] = PassiveChoiceList.Control(self, Game.FeatPassives, i)
+    end
+    for i = 1, #SpellChoices.Read(Game.FeatSpells) do
+        out[#out + 1] = SpellChoiceList.Control(self, Game.FeatSpells, i)
+    end
+    return out
+end
 LevelUp.Widgets = { Game.Widget }
 
 function LevelUp.New(widget)
@@ -63,6 +190,7 @@ function LevelUp:Build()
     for i = 1, #SpellChoices.Read(Game.Spells) do
         out[#out + 1] = SpellChoiceList.Control(self, Game.Spells, i)
     end
+    for _, c in ipairs(featControls(self)) do out[#out + 1] = c end
     if #r.pending > 0 then
         local names = {}
         for _, k in ipairs(r.pending) do names[#names + 1] = L("level_up_choice_" .. k) end
@@ -104,6 +232,7 @@ function LevelUp:Help()
     local lines = ListScreen.Help(self)
     lines[#lines + 1] = L("help_level_up")
     if #SpellChoices.Read(Game.Spells) > 0 then lines[#lines + 1] = L("help_level_up_spells") end
+    if #Game.Feat.list() > 0 then lines[#lines + 1] = L("help_level_up_feat") end
     return lines
 end
 

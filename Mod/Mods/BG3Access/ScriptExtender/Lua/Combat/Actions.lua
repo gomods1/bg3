@@ -17,6 +17,7 @@ local Combat = Ext.Require("Game/Combat.lua")
 local Entities = Ext.Require("Game/Entities.lua")
 local Speech = Ext.Require("Core/Speech.lua")
 local Strings = Ext.Require("Core/Strings.lua")
+local Loca = Ext.Require("Game/Loca.lua")
 local ListScreen = Ext.Require("Screens/ListScreen.lua")
 local Controls = Ext.Require("Screens/Controls.lua")
 local Targeting = Ext.Require("Combat/Targeting.lua")
@@ -52,6 +53,27 @@ local function levelWords(level)
     return Strings.List({ L("cast_level", { n = level }), slots and L("spell_slots_left", { n = slots.value }) })
 end
 
+-- "unavailable" with the reason when the game's rules give one ("no disponible, solo en combate";
+-- "no disponible, sin Furia"), or nil when the action can be used.
+local function unavailableWords(a)
+    local why = Hotbar.Shortfall(a.bar, a.slot)
+    if not why then return nil end
+    local parts = { L("unavailable") }
+    if why.combat == "only" then parts[#parts + 1] = L("unavailable_combat_only") end
+    if why.combat == "never" then parts[#parts + 1] = L("unavailable_outside_combat") end
+    for _, status in ipairs(why.statuses) do
+        if status == "SG_Rage" then
+            parts[#parts + 1] = L("unavailable_needs_rage")
+        else
+            -- Internal statuses carry placeholder names ("%%% Rage Bear heal toggle"): not said.
+            local name = Loca.StatName(status)
+            if name and not name:find("%%%%%%") then parts[#parts + 1] = L("unavailable_needs_status", { name = name }) end
+        end
+    end
+    if #why.missing > 0 then parts[#parts + 1] = L("unavailable_missing", { names = Strings.List(why.missing) }) end
+    return Strings.List(parts)
+end
+
 function Actions:Describe(a)
     local parts = { a.name or a.id or "?" }
     if a.count and a.count > 1 then parts[#parts + 1] = L("item_count_only", { n = a.count }) end
@@ -61,7 +83,7 @@ function Actions:Describe(a)
         parts[#parts + 1] = L("spell_level", { n = a.spellLevel })
     end
     if COSTS[a.cost or ""] then parts[#parts + 1] = L(COSTS[a.cost]) end
-    if not Hotbar.CanUse(a.bar, a.slot) then parts[#parts + 1] = L("unavailable") end
+    parts[#parts + 1] = unavailableWords(a)
     return Strings.List(parts)
 end
 
@@ -77,22 +99,28 @@ function Actions:ChangeLevel(a, delta)
     Speech.Say(Strings.List({ levelWords(v.level), not v.canUse and L("unavailable") }), { interrupt = true })
 end
 
+-- The game's hotbars, one section each (NAVIGATION.md: Tab between them).
+local BAR_SECTIONS = { "hotbar_common", "hotbar_class", "hotbar_items", "hotbar_custom" }
+
 function Actions:Build()
     self.levels = self.levels or {}
     local out = {}
     for _, a in ipairs(Hotbar.Actions()) do
-        out[#out + 1] = Controls.Item({
+        local item = Controls.Item({
             kind = "button",
             describe = function() return self:Describe(a) end,
             activate = function() self:Use(a) end,
             change = a.levels and function(delta) self:ChangeLevel(a, delta) end or nil,
         })
+        item.section = L(BAR_SECTIONS[a.barOrder] or "hotbar_custom")
+        out[#out + 1] = item
     end
     return out
 end
 
-local function refuse(name)
-    Speech.Say(L("could_not_activate", { label = name or "?", reason = L("reason_unavailable") }), { interrupt = true })
+local function refuse(name, a)
+    local reason = a and unavailableWords(a) or L("reason_unavailable")
+    Speech.Say(L("could_not_activate", { label = name or "?", reason = reason }), { interrupt = true })
 end
 
 -- Opens the mod's targeting for an armed action by the game's targeting type (see the top):
@@ -136,7 +164,7 @@ function Actions:Use(a)
     if variant then spell = variant.id or spell end
     local armed = variant and (variant.canUse and Hotbar.UseAt(a.bar, a.slot, level)) or (not variant and Hotbar.CanUse(a.bar, a.slot) and Hotbar.Use(a.bar, a.slot))
     if not armed then
-        refuse(a.name)
+        refuse(a.name, a)
         return
     end
     Hud.Followed() -- this list follows it (potions and items too)

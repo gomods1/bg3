@@ -12,6 +12,7 @@
 --   FinishLevelUp("Overview"): a string parameter, so the button is clicked.
 local Vm = Ext.Require("Game/Vm.lua")
 local Ui = Ext.Require("Game/Ui.lua")
+local Loca = Ext.Require("Game/Loca.lua")
 local Selectable = Ext.Require("Game/Selectable.lua")
 local PassiveChoices = Ext.Require("Game/PassiveChoices.lua")
 local Player = Ext.Require("Game/Player.lua")
@@ -49,9 +50,7 @@ end
 
 -- Choice lists that need the player (not handled by the mod yet): { names of what is pending }.
 -- (PassiveFeatures is not one: it lists the passives gained, e.g. the chosen Wildheart heart.)
-local PENDING = {
-    { list = "SelectableFeats", key = "feat" },
-}
+local PENDING = {}
 
 -- After one character's level up the game opens the next one's in the same widget (verified:
 -- Tav, then Shadowheart): watch name and step.
@@ -152,6 +151,162 @@ LevelUp.Subclass = {
     current = function() return Selectable.Current(dc(), SUBCLASS) end,
     select = function(i) return Selectable.Select(dc(), SUBCLASS, i) end,
 }
+
+-- Feats (levels 4, 8, 12). From the XAML (CCLib_k.xaml featsList, not yet seen live): the DC's
+-- SelectableFeats (ls.VMSelectableFeat: Name, Description, IsRequirementsMet, IsAlreadyTaken,
+-- Requirements[] { Requirement, IsMet }) and SelectedFeat, two-way bound to the list: set on
+-- the DC like the subclass. The chosen feat's panel reads SelectedFeatDetails: HasFeat,
+-- FeatDetails { AbilitySelection[], SelectedAbilityCount, MaxSelectedAbilityCount,
+-- SpellSelectors[] }, FeatSkills { Skills[], SelectedSkillCount, MaxSelectedSkillCount },
+-- FeatPassives[] (passive selectors). Its buttons: the DC's SelectAbility / DeselectAbility
+-- (ability row), ToggleSkill (skill row), TogglePassive (passive), as in character creation.
+local FEAT = { list = "SelectableFeats", selected = "SelectedFeat" }
+LevelUp.FeatLabel = "hb7180a49g729ag4ec3g9f87gaeadb7d4252c" -- "Seleccionar una dote" (CCLib_k.xaml)
+LevelUp.FeatAbilitiesLabel = "h72161eb0g8981g45cfgba63ga76e152e1fe9" -- "Puntos de característica asignados:"
+LevelUp.FeatSkillsLabel = "h0bddbaf0g8c93g4ddfgbb52ge3c54b72c3c6" -- "Seleccionar habilidades de la dote"
+
+local function featSnapshot(vm, selectedKey)
+    local unmet = {}
+    for _, r in ipairs(Vm.List(vm, "Requirements")) do
+        if Vm.Get(r, "IsMet") == false then unmet[#unmet + 1] = Vm.Text(r, "Requirement") end
+    end
+    local taken = Vm.Get(vm, "IsAlreadyTaken") == true
+    return {
+        label = Vm.Text(vm, "Name") or "?",
+        description = Vm.Text(vm, "Description"),
+        selected = selectedKey ~= nil and Selectable.Key(vm) == selectedKey,
+        available = Vm.Get(vm, "IsRequirementsMet") ~= false and not taken,
+        taken = taken,
+        unmet = unmet,
+    }
+end
+
+LevelUp.Feat = {
+    list = function()
+        local d = dc()
+        local sel = Vm.Get(d, FEAT.selected)
+        local key = sel and Selectable.Key(sel) or nil
+        local out = {}
+        for i, vm in ipairs(Vm.List(d, FEAT.list)) do out[i] = featSnapshot(vm, key) end
+        return out
+    end,
+    current = function()
+        local sel = Vm.Get(dc(), FEAT.selected)
+        return sel and featSnapshot(sel, Selectable.Key(sel)) or nil
+    end,
+    select = function(i)
+        local d = dc()
+        local item = Vm.List(d, FEAT.list)[i]
+        if not item then return false end
+        return pcall(function() d:SetProperty(FEAT.selected, item) end)
+    end,
+}
+
+local function featDetails() return Vm.Get(dc(), "SelectedFeatDetails") end
+
+-- The chosen feat's ability points (Athlete: +1 to Strength or Dexterity; Ability Improvement:
+-- 2 points): { chosen, max, list = { { id, name, value, improvement } } } or nil when it has none.
+function LevelUp.FeatAbilities()
+    local fd = Vm.Get(featDetails(), "FeatDetails")
+    local rows = Vm.List(fd, "AbilitySelection")
+    if #rows == 0 then return nil end
+    local out = { chosen = Vm.Get(fd, "SelectedAbilityCount") or 0, max = Vm.Get(fd, "MaxSelectedAbilityCount") or 0, list = {} }
+    for i, a in ipairs(rows) do
+        local id = Vm.Enum(a, "Ability")
+        out.list[i] = {
+            id = id,
+            name = (id and Loca.Enum("AbilityDisplayName", id)) or Vm.Text(a, "Name") or id or "?",
+            value = Vm.Get(a, "Value"),
+            improvement = Vm.Get(a, "Improvement") or 0,
+        }
+    end
+    return out
+end
+
+-- One point more (delta 1) or less (-1) on the chosen feat's ability i. Returns ok.
+function LevelUp.ChangeFeatAbility(i, delta)
+    local a = Vm.List(Vm.Get(featDetails(), "FeatDetails"), "AbilitySelection")[i]
+    if not a then return false end
+    return Vm.Run(dc(), delta > 0 and "SelectAbility" or "DeselectAbility", a)
+end
+
+-- The chosen feat's skills (Skilled: 3): { chosen, max, list = { { id, name, ability, selected,
+-- proficient, enabled } } } or nil.
+function LevelUp.FeatSkills()
+    local g = Vm.Get(featDetails(), "FeatSkills")
+    local rows = Vm.List(g, "Skills")
+    if #rows == 0 then return nil end
+    local out = { chosen = Vm.Get(g, "SelectedSkillCount") or 0, max = Vm.Get(g, "MaxSelectedSkillCount") or 0, list = {} }
+    for i, sk in ipairs(rows) do
+        local id, ability = Vm.Enum(sk, "Skill"), Vm.Enum(sk, "Ability")
+        out.list[i] = {
+            id = id,
+            name = (id and Loca.Enum("SkillDisplayName", id)) or Vm.Text(sk, "Name") or id or "?",
+            ability = ability and (Loca.Enum("AbilityDisplayName", ability) or ability),
+            selected = Vm.Get(sk, "Selected") == true,
+            proficient = Vm.Get(sk, "IsProficient") == true,
+            enabled = Vm.Get(sk, "Enabled") == true,
+        }
+    end
+    return out
+end
+
+function LevelUp.ToggleFeatSkill(i)
+    local sk = Vm.List(Vm.Get(featDetails(), "FeatSkills"), "Skills")[i]
+    if not sk then return false end
+    return Vm.Run(dc(), "ToggleSkill", sk)
+end
+
+-- The chosen feat's passive choices (Elemental Adept's element...), for Game/PassiveChoices.
+LevelUp.FeatPassives = {
+    dc = dc,
+    selectors = function() return Vm.List(featDetails(), "FeatPassives") end,
+}
+
+-- The chosen feat's spell choices (Magic Initiate), for Game/SpellChoices. The feat panel shows
+-- each selector with an edit toggle (editSpellSelectorBtn); checking it shows SpellSelectorGrid
+-- with the selector as spellSelectorData's DataContext (CCLib_k.xaml FeatSpellSelector), whose
+-- buttons are SelectSpell / DeselectSpell.
+local FEAT_TAB_MS = 400
+local function featSpellSelectors() return Vm.List(Vm.Get(featDetails(), "FeatDetails"), "SpellSelectors") end
+LevelUp.FeatSpells = {
+    widget = LevelUp.Widget,
+    ready = function(onReady, onWait) LevelUp.WhenClickable(onReady, onWait) end,
+    selectors = featSpellSelectors,
+    selectButton = "SelectSpell",
+    deselectButton = "DeselectSpell",
+    isOpen = function(i)
+        local data = Ui.FindElement(LevelUp.Widget, "spellSelectorData")
+        local grid = Ui.FindElement(LevelUp.Widget, "SpellSelectorGrid")
+        return grid ~= nil and Ui.IsShown(grid) and Vm.Same(Vm.Get(data, "DataContext"), featSpellSelectors()[i])
+    end,
+    open = function(i, onDone)
+        -- The feat panel exists only while the game's feat tab is selected (the overview is
+        -- shown again whenever the mod's list is back at its top).
+        LevelUp.ShowFeatTab()
+        -- Checking the toggle with SetProperty did not run its triggers (2026-09-26): the mod
+        -- does what they do, showing the grid with the selector as its data (verified: the
+        -- 15 SelectSpell buttons of Magic Initiate: Wizard's cantrips appeared).
+        Timer.After(FEAT_TAB_MS, function()
+            local s = featSpellSelectors()[i]
+            local grid = Ui.FindElement(LevelUp.Widget, "SpellSelectorGrid")
+            local data = Ui.FindElement(LevelUp.Widget, "spellSelectorData")
+            if not (s and grid and data) then onDone(false) return end
+            local ok = pcall(function()
+                data:SetProperty("DataContext", s)
+                grid:SetProperty("Visibility", "Visible")
+            end)
+            onDone(ok)
+        end)
+    end,
+}
+
+-- The game's feat tab (featTab, a ListBoxItem shown while CanSelectFeat), as a player opens it
+-- to choose: its panel shows the chosen feat's details.
+function LevelUp.ShowFeatTab()
+    local tab = Ui.FindElement(LevelUp.Widget, "featTab")
+    if tab then tab:SetProperty("IsSelected", true) end
+end
 
 -- Back to the level-up overview (the game's first tab: what the level brings, Accept).
 function LevelUp.ShowOverview()

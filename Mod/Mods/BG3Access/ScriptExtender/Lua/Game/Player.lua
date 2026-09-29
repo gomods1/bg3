@@ -64,13 +64,39 @@ function Player.PartyNames()
     return out
 end
 
+-- The party's characters in the order of their portraits (AssignedCharacters; the game's F1-F4
+-- select them by that position): { { uuid, name, controlled } }.
+function Player.Party()
+    local out = {}
+    local selected = Vm.Get(Player.SelectedCharacter(), "EntityUUID")
+    for _, c in ipairs(Vm.List(Player.Current(), "AssignedCharacters")) do
+        local uuid = Vm.Get(c, "EntityUUID")
+        if uuid and uuid ~= "" then
+            out[#out + 1] = { uuid = tostring(uuid), name = Vm.Text(c, "Name"), controlled = uuid == selected }
+        end
+    end
+    return out
+end
+
+-- The character VM (valid this tick) of the party member with entity uuid, or nil.
+function Player.MemberVm(uuid)
+    for _, c in ipairs(Vm.List(Player.Current(), "AssignedCharacters")) do
+        if Vm.Get(c, "EntityUUID") == uuid then return c end
+    end
+    return nil
+end
+
+-- function(uuid), called before the mod itself selects a party member (set by Setup/Commands: the
+-- combat tracker then announces the switch at once).
+Player.OnSelect = nil
+
 -- Selects the party member with entity uuid, as a click on their portrait does (the DC's
 -- SelectCharacter with the character's VM, CharacterSelectArea in the portraits' XAML). Returns ok.
 function Player.Select(uuid)
-    for _, c in ipairs(Vm.List(Player.Current(), "AssignedCharacters")) do
-        if Vm.Get(c, "EntityUUID") == uuid then return Vm.Run(sourceDc(), "SelectCharacter", c) end
-    end
-    return false
+    local c = Player.MemberVm(uuid)
+    if not c then return false end
+    if Player.OnSelect then Player.OnSelect(uuid) end
+    return Vm.Run(sourceDc(), "SelectCharacter", c)
 end
 
 -- true while it is the local player's turn in combat (CurrentPlayer.IsCurrentTurn).

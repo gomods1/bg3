@@ -1,6 +1,13 @@
--- Base for screens the mod presents as a vertical list of controls (Screens/Controls): the
--- navigation layer of template_rpg 10.4 for tier-C screens.
--- Keys: Up/Down move, Home/End jump, Enter/Space/keypad Enter activate, Left/Right change a value.
+-- Base for screens the mod presents as a list of controls (Screens/Controls): the navigation layer
+-- of template_rpg 10.4 for tier-C screens, following NAVIGATION.md (navigation by meaning, never by
+-- the screen's layout; one key grammar everywhere).
+-- Sections: a control may carry section = "<name>"; consecutive controls with the same section are
+-- one section (a hotbar, a spell level, a history buffer, a kind of nearby thing). Tab / Shift+Tab
+-- go to the next / previous section (wrapping) and say its name and size first; the other keys stay
+-- inside the section.
+-- Keys: Up/Down move (no wrap: the end item is said again), Home/End jump to the section's ends,
+-- Enter/Space/keypad Enter activate, Left/Right change a value, else move like Up/Down (a screen
+-- where the game's own Left/Right matter, Difficulty's preset carousel, passes them on itself).
 -- A letter jumps to the next item starting with it, in mod screens (onClose, or LetterJump set
 -- by the screen class: the mod menu) and sub-lists only (Gale's 40 spells at level 3); on screens
 -- that mirror the game's own, letters stay the game's (M closes the map, I the inventory).
@@ -155,6 +162,44 @@ function ListScreen:Speak(control)
     Speech.Say(control.Describe(), { interrupt = true })
 end
 
+-- The first and last index of the section holding control i (the whole list when it has none).
+function ListScreen:SectionRange(i)
+    local c = self.controls[i]
+    if not c then return 1, #self.controls end
+    local first, last = i, i
+    while first > 1 and self.controls[first - 1].section == c.section do first = first - 1 end
+    while last < #self.controls and self.controls[last + 1].section == c.section do last = last + 1 end
+    return first, last
+end
+
+-- The first index of each section, in order.
+function ListScreen:SectionStarts()
+    local starts = {}
+    for i, c in ipairs(self.controls) do
+        if i == 1 or self.controls[i - 1].section ~= c.section then starts[#starts + 1] = i end
+    end
+    return starts
+end
+
+-- "Combat, 3 items" (a section's name and size), or nil for a list without sections.
+function ListScreen:SectionIntro(i)
+    local c = self.controls[i]
+    if not (c and c.section) then return nil end
+    local first, last = self:SectionRange(i)
+    return L("section_intro", { section = c.section, count = L("count_items", { n = last - first + 1 }) })
+end
+
+-- Speaks control i, with its section's name and size first when the focus came into it.
+function ListScreen:SpeakAt(i, entered)
+    local c = self.controls[i]
+    local intro = entered and self:SectionIntro(i)
+    if intro then
+        Speech.Say(Strings.Sentences({ intro, c.Describe() }), { interrupt = true })
+    else
+        self:Speak(c)
+    end
+end
+
 function ListScreen:Move(delta)
     if #self.controls == 0 then self:Refresh() end
     local n = #self.controls
@@ -162,14 +207,37 @@ function ListScreen:Move(delta)
         Speech.Say(L("screen_empty", { title = self:CurrentTitle() }), { interrupt = true })
         return
     end
-    self.index = math.max(1, math.min(n, self.index + delta))
+    if self.index < 1 then
+        self.index = 1
+        self:SpeakAt(1, true)
+        return
+    end
+    local first, last = self:SectionRange(self.index)
+    self.index = math.max(first, math.min(last, self.index + delta))
     self:Speak(self.controls[self.index])
 end
 
 function ListScreen:Jump(toLast)
     if #self.controls == 0 then return end
-    self.index = toLast and #self.controls or 1
+    if self.index < 1 then self.index = 1 end
+    local first, last = self:SectionRange(self.index)
+    self.index = toLast and last or first
     self:Speak(self.controls[self.index])
+end
+
+-- Tab / Shift+Tab: the next / previous section's first item (wrapping). False when the list has
+-- one section or none, so the key stays the game's.
+function ListScreen:NextSection(step)
+    local starts = self:SectionStarts()
+    if #starts < 2 then return false end
+    local at = 0
+    for k, i in ipairs(starts) do
+        if i <= math.max(self.index, 1) then at = k end
+    end
+    local k = ((at - 1 + step) % #starts) + 1
+    self.index = starts[k]
+    self:SpeakAt(self.index, true)
+    return true
 end
 
 function ListScreen:Activate()
@@ -183,10 +251,13 @@ function ListScreen:Activate()
     end
 end
 
--- Returns handled: false lets the key through to the game when the control has no value to change.
+-- Left/Right: the control's value; a control without one moves like Up/Down (NAVIGATION.md).
 function ListScreen:Change(delta, fine)
     local c = self:Current()
-    if not (c and c.Change) then return false end
+    if not (c and c.Change) then
+        self:Move(delta)
+        return true
+    end
     c.Change(delta, fine)
     return true
 end
@@ -206,6 +277,7 @@ end
 
 function ListScreen:Help()
     local lines = { L("help_list") }
+    if #self:SectionStarts() > 1 then lines[#lines + 1] = L("help_sections") end
     if self:Count("option") > 0 then lines[#lines + 1] = L("help_change") end
     if #self.levels > 0 then lines[#lines + 1] = L("help_back") end
     return lines
@@ -240,8 +312,9 @@ function ListScreen:JumpToLetter(key)
     for step = 1, n do
         local i = (self.index + step - 1) % n + 1
         if firstLetter(self.controls[i].Describe()) == letter then
+            local entered = not self.controls[self.index] or self.controls[self.index].section ~= self.controls[i].section
             self.index = i
-            self:Speak(self.controls[i])
+            self:SpeakAt(i, entered)
             return
         end
     end
@@ -258,6 +331,8 @@ function ListScreen:OnKey(combo)
     if combo == "UP" then self:Move(-1) return true end
     if combo == "HOME" then self:Jump(false) return true end
     if combo == "END" then self:Jump(true) return true end
+    if combo == "TAB" then return self:NextSection(1) end
+    if combo == "SHIFT+TAB" then return self:NextSection(-1) end
     if ACTIVATE[combo] then self:Activate() return true end
     if combo == "LEFT" then return self:Change(-1) end
     if combo == "RIGHT" then return self:Change(1) end

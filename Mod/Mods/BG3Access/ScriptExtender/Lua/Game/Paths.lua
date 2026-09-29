@@ -14,12 +14,18 @@
 -- in that column). Long routes are fine: 323 m, 1350 checkpoints in a few ms (grove -> ruins).
 -- Closed doors the character cannot pass (the grove's portcullis) fail the search unless
 -- CheckLockedDoors is false (verified 2026-09-24): ClosedDoorOnWay names them.
+-- SearchHorizon (nodes a search may expand, 32000 by default) IS a limit on long winding routes
+-- (verified 2026-09-26, Blighted Village): the teahouse, the goblin camp and Halsin's marker all
+-- failed with ErrorCause 1 at 32000 and were found at 64000+ (the teahouse: 1088 checkpoints, a
+-- 270 m detour east and down the hill, 47 ms). A search that cannot succeed stops when the
+-- reachable ground runs out: failures cost 48-59 ms at 128000 or 512000 alike (28 ms at 32000).
 local Entities = Ext.Require("Game/Entities.lua")
 local Timer = Ext.Require("Core/Timer.lua")
 
 local Paths = {}
 
 local DOOR_NEAR_ROUTE_METERS = 2.0
+local SEARCH_HORIZON = 256000
 
 -- p moved to the walkable height nearest to it in its column (p itself when there is none).
 function Paths.Snap(p)
@@ -46,6 +52,7 @@ function Paths.Find(fromUuid, to, options)
     pcall(function()
         path.CanUseLadders = true
         path.CanUsePortals = true
+        path.SearchHorizon = SEARCH_HORIZON
         if options and options.ignoreDoors then path.CheckLockedDoors = false end
     end)
     local result = { found = false, points = {}, flags = {}, portals = {}, portalInfo = {} }

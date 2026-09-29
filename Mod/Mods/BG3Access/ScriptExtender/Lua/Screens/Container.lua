@@ -33,7 +33,8 @@ function Container:Build()
     if containers[1] and containers[1].name then self.title = containers[1].name end
     local n = 0
     for _, c in ipairs(containers) do
-        if #containers > 1 then out[#out + 1] = Controls.Text(c.name or "?") end
+        -- several containers open: one section each (NAVIGATION.md: Tab between them)
+        local section = #containers > 1 and (c.name or "?") or nil
         for _, item in ipairs(c.items) do
             n = n + 1
             local index = n
@@ -51,6 +52,7 @@ function Container:Build()
                     Timer.After(TAKE_SETTLE_MS, function() self:Refresh() end)
                 end,
             })
+            out[#out].section = section
         end
     end
     if #out == 0 then out[#out + 1] = Controls.Text(L("container_empty")) end

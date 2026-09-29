@@ -69,6 +69,13 @@ Ctrl+letters are migrated out. New features register a command; they do not take
 Screen handlers claim plain navigation keys (arrows, Enter, Space, Home/End, Tab) only while their
 screen is in front. Never take Insert/Caps Lock (NVDA modifiers).
 
+**Navigation follows meaning, not the screen's layout (user rule, 2026-09-29): read
+`NAVIGATION.md`.** Lists are sections (Tab / Shift+Tab, `control.section` in Screens/ListScreen)
+holding items (Up/Down; Left/Right a value, else the same as Up/Down), levels on Enter and
+Escape/Backspace; one key grammar for every screen and list (History's buffers, Nearby's kinds,
+the mod menu's groups, the hotbars, spell levels are sections since 2026-09-29, no longer
+Left/Right); only the place cursor uses the arrows for space.
+
 **Localizable code (user rule, 2026-09-24)**: the mod's words live only in Core/Strings (whole
 phrases, `{named}` placeholders). Code never glues words: lists through `Strings.List`, sentences
 through `Strings.Sentences`, numbers are passed as numbers (the language's decimal separator), a
@@ -320,7 +327,7 @@ Note: printing these logs through Python in Git Bash needs `sys.stdout.reconfigu
   "Arboleda Esmeralda" sits 29 m under the grove) -> `Ext.Level.GetHeightsAt(x, z)` gives the AI
   grid's walkable heights in that column (Paths.Snap). A closed door the character cannot open
   (the grove's portcullis) fails the search; with `CheckLockedDoors = false` it is found through
-  the door (Paths.ClosedDoorOnWay names it). `SearchHorizon` (32000) was never the limit.
+  the door (Paths.ClosedDoorOnWay names it). **Correction (2026-09-26): `SearchHorizon` (32000 nodes by default) IS a limit** on long winding routes: the Riverside Teahouse, the goblin camp and Halsin's marker failed from the Blighted Village with ErrorCause 1 and were found at 64000+ (teahouse: 1088 checkpoints, a 270 m detour east and down the hill, 47 ms); a search that cannot succeed stops when the reachable ground runs out (48-59 ms at 128000 or 512000). Paths.Find uses 256000. The teahouse was never a jump.
   `ErrorCause` 3 = found. So the mod needs no pathfinding of its own; what a blind player lacks
   is **destinations** (places with no marker and nothing clickable) and a way to see the map.
 - Picked ground can be a ledge next to the route (grove stairs: within 3 m height of a route
@@ -583,6 +590,19 @@ Note: printing these logs through Python in Git Bash needs `sys.stdout.reconfigu
 | Difficulty (DMSettings) | Left/Right change the preset (real and injected keys) |
 | Options | Escape closes |
 
+## Offline tests (`tools/test_lua.py`, 2026-09-26)
+
+`python tools/test_lua.py [pattern]` runs `tests/lua/*_test.lua` in Lua 5.4 through **lupa**
+(PyPI `pip install lupa`; decision: no Lua on the machine, lupa bundles the SE's Lua version) with
+a stub of the SE API (Ext.Require against the mod's Lua folder, Tick/KeyInput subscribers, a
+movable clock, in-memory Ext.IO). Pure modules are tested there (Strings, Text, Keys, Poll,
+Recent, Words); `syntax_test.lua` compiles every module. Engine objects are not stubbed: what
+reads the UI or entities is verified in the game (PLAYTEST.md). Add a test with each pure change.
+
+Polling: every reader of game state registers with `Core/Poll.Every(name, ms, fn)` (one Tick
+subscriber, cost statistics: `game.py lua 'return BG3Access.Poll.Report()'`). Measured 2026-09-26:
+the six pollers together cost about 5 ms per second on the HUD.
+
 ## Test harness (`tools/game.py`)
 
 `launch` (removes ModCrashSanityCheck, starts bg3.exe --skip-launcher), `stop` (kill by PID, waits),
@@ -617,6 +637,12 @@ and `$Profile` are PowerShell automatic variables.
   modsettings.lsx without BG3Access, first-run flow again). Symptom: silence, SE log shows no
   BG3Access bootstrap. Fix: `python tools/deploy.py`.
 - `game.py press ctrl` presses C (bare modifiers are not keys in the harness).
+- The Bash tool can run sandboxed (2026-09-26): the game window is invisible to it (`press`,
+  `click`, `shot` say "no game window"). Run those through the PowerShell tool; `lua`, `log`,
+  `wait-log` work from either (file based).
+- The main menu's "Continuar" loads the newest save by time, which may be another game's
+  (2026-09-26: a fresh nautiloid autosave instead of the Blighted Village): load by name instead
+  (`restore NN`, then the mod's `loadGame` list).
 
 - Git Bash heredocs ate backslashes in Rust sources: write source files with the Write tool.
 - `cp` onto the .pak fails while the game is still exiting ("Device or resource busy"): `stop` waits now.

@@ -238,12 +238,20 @@ def newest_se_log():
 
 
 def wait_log(text, timeout=300):
+    r"""Waits for a NEW speech line matching the regex text (lines already in the log do not count;
+    grep-style "a\|b" alternatives are accepted too)."""
+    import re
+    pattern = re.compile(text.replace(r"\|", "|"))
+    start = os.path.getsize(SPEECH_LOG) if os.path.exists(SPEECH_LOG) else 0
     end = time.time() + timeout
     while time.time() < end:
         if os.path.exists(SPEECH_LOG):
-            with open(SPEECH_LOG, encoding="utf-8", errors="replace") as f:
-                if text in f.read():
-                    print(f"found: {text}")
+            with open(SPEECH_LOG, "rb") as f:
+                f.seek(start)
+                new = f.read().decode("utf-8", errors="replace")
+            for line in new.splitlines():
+                if pattern.search(line):
+                    print(f"found: {line.strip()}")
                     return 0
         time.sleep(1)
     print(f"timeout waiting for: {text}")
@@ -321,8 +329,14 @@ SAVE_DIR = os.path.join(PROFILE, "PlayerProfiles", "Public", "Savegames", "Story
 BACKUPS = os.path.join(REPO, "saves")
 
 
+def backup_number(d):
+    """The number a backup folder starts with ("99_x" -> 99, "100_y" -> 100)."""
+    return int(d.split("_")[0])
+
+
 def backups():
-    return sorted(d for d in os.listdir(BACKUPS) if d[:2].isdigit() and os.path.isdir(os.path.join(BACKUPS, d)))
+    return sorted((d for d in os.listdir(BACKUPS) if d.split("_")[0].isdigit() and os.path.isdir(os.path.join(BACKUPS, d))),
+                  key=backup_number)
 
 
 def save_backup(name, note):
@@ -346,7 +360,7 @@ def save_backup(name, note):
         print("no new save appeared")
         return 1
     time.sleep(2)  # let the game finish writing
-    n = 1 + max([int(d[:2]) for d in backups()] or [0])
+    n = 1 + max([backup_number(d) for d in backups()] or [0])
     dest = os.path.join(BACKUPS, f"{n:02d}_{name}")
     shutil.copytree(os.path.join(SAVE_DIR, new), os.path.join(dest, new))
     with open(os.path.join(dest, "README.txt"), "w", encoding="utf-8") as f:
@@ -358,7 +372,7 @@ def save_backup(name, note):
 def restore_backup(key):
     """Copies a backup's save folder back into the profile so the game's Load menu lists it."""
     import shutil
-    match = [d for d in backups() if d == key or d.startswith(key + "_") or d[:2] == key.zfill(2) or d.endswith("_" + key)]
+    match = [d for d in backups() if d == key or d.startswith(key + "_") or (key.isdigit() and backup_number(d) == int(key)) or d.endswith("_" + key)]
     if not match:
         print("no backup", key)
         return 1

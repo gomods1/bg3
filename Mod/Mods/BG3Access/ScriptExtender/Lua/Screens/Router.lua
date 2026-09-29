@@ -6,6 +6,7 @@ local Log = Ext.Require("Core/Log.lua")
 local Speech = Ext.Require("Core/Speech.lua")
 local Strings = Ext.Require("Core/Strings.lua")
 local Bridge = Ext.Require("Core/Bridge.lua")
+local Poll = Ext.Require("Core/Poll.lua")
 local Generic = Ext.Require("Screens/Generic.lua")
 
 local Router = {}
@@ -101,13 +102,7 @@ local function tick()
 end
 
 function Router.Start()
-    local last = 0
-    Ext.Events.Tick:Subscribe(function()
-        local now = Ext.Timer.MonotonicTime()
-        if now - last < TICK_MS then return end
-        last = now
-        Log.Guard("router tick", tick)
-    end)
+    Poll.Every("router", TICK_MS, tick)
 end
 
 -- Called by Keys for every press not bound to a global action; true = the game must not see it.

@@ -9,7 +9,7 @@ local Watchers = Ext.Require("Game/Watchers.lua")
 local Entities = Ext.Require("Game/Entities.lua")
 local Speech = Ext.Require("Core/Speech.lua")
 local Strings = Ext.Require("Core/Strings.lua")
-local Log = Ext.Require("Core/Log.lua")
+local Poll = Ext.Require("Core/Poll.lua")
 
 local L = Strings.Get
 
@@ -74,13 +74,7 @@ local function poll()
 end
 
 function Stealth.Start()
-    local last = 0
-    Ext.Events.Tick:Subscribe(function()
-        local t = Ext.Timer.MonotonicTime()
-        if t - last < POLL_MS then return end
-        last = t
-        Log.Guard("stealth", poll)
-    end)
+    Poll.Every("stealth", POLL_MS, poll)
 end
 
 return Stealth

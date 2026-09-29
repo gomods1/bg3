@@ -4,7 +4,7 @@
 local StoryTimer = Ext.Require("Game/StoryTimer.lua")
 local Speech = Ext.Require("Core/Speech.lua")
 local Strings = Ext.Require("Core/Strings.lua")
-local Log = Ext.Require("Core/Log.lua")
+local Poll = Ext.Require("Core/Poll.lua")
 
 local L = Strings.Get
 
@@ -44,13 +44,7 @@ local function poll()
 end
 
 function Timers.Start()
-    local lastPoll = 0
-    Ext.Events.Tick:Subscribe(function()
-        local now = Ext.Timer.MonotonicTime()
-        if now - lastPoll < POLL_MS then return end
-        lastPoll = now
-        Log.Guard("story timers", poll)
-    end)
+    Poll.Every("story timers", POLL_MS, poll)
 end
 
 return Timers

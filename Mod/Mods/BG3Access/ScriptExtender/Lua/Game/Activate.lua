@@ -690,7 +690,8 @@ local CANCEL_CHECK_MS = 600
 function Activate.CancelArmed()
     Activate.Key("ESCAPE")
     Timer.After(CANCEL_CHECK_MS, function()
-        if Hotbar.Armed() then
+        -- Only when the cursor is off the world: a hover preview reads as armed too.
+        if Hotbar.Armed() and Ui.WidgetUnderPointer() then
             trace("armed action still armed after Escape: cancelling again")
             Activate.Key("ESCAPE")
         end

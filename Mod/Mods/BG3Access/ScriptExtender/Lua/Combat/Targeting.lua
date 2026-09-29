@@ -66,8 +66,8 @@ function Targeting.New(actionName, onClose, choosePlace, opts)
     local mine = Entities.Position(me)
     local listed = {}
     for _, t in ipairs(targets) do listed[t.uuid] = true end
-    local function addWorld(o)
-        if listed[o.uuid] or o.uuid == me then return end
+    local function addWorld(o, self_)
+        if listed[o.uuid] or (o.uuid == me and not self_) then return end
         listed[o.uuid] = true
         local hp, maxHp = Entities.Health(o.uuid)
         targets[#targets + 1] = {
@@ -78,14 +78,30 @@ function Targeting.New(actionName, onClose, choosePlace, opts)
     if mine then
         if not Combat.Current() then
             for _, o in ipairs(Interactables.Near(mine, WORLD_TARGET_RADIUS, WORLD_TARGET_MAX_DY)) do
-                if o.category == "character" and not Entities.IsDead(o.uuid) then addWorld(o) end
+                -- A party member at 0 hit points is down, not dead: Help and healing bring them
+                -- back (Shadowheart stabilized after the chapel fight, 2026-09-26).
+                if o.category == "character" and (not Entities.IsDead(o.uuid) or Entities.IsPartyMember(o.uuid)) then addWorld(o) end
             end
         end
         for _, o in ipairs(Interactables.Attackable(mine, WORLD_TARGET_RADIUS, WORLD_TARGET_MAX_DY)) do addWorld(o) end
+        -- Out of combat the caster is no combatant: listed too when the spell may target them
+        -- (Shadowheart's Lesser Restoration on her own rotting flesh, 2026-09-26).
+        if me and Spells.CanTargetSelf(self.spell) then
+            addWorld({ uuid = me, name = Entities.Name(me), position = mine }, true)
+        end
     end
+    -- Enemies first, then the other characters, then the party, then objects (out of combat the
+    -- list held 104 entries in the worg pens, Birka the brawler 13th behind candles and barrels,
+    -- 2026-09-26); nearest first within each rank.
+    local function rank(t)
+        if t.relation == "Enemy" then return 0 end
+        if t.relation == "Player" or (t.world and Entities.IsPartyMember(t.uuid)) then return 2 end
+        if not t.world or Entities.IsCharacter(t.uuid) then return 1 end
+        return 3
+    end
+    for _, t in ipairs(targets) do t.rank = rank(t) end
     table.sort(targets, function(a, b)
-        local ea, eb = a.relation == "Enemy", b.relation == "Enemy"
-        if ea ~= eb then return ea end
+        if a.rank ~= b.rank then return a.rank < b.rank end
         return a.distance < b.distance
     end)
     self.targets = targets
@@ -147,10 +163,28 @@ function Targeting:Build()
     return out
 end
 
--- Focus = hover: speak the target at once, then the game's preview for it.
-function Targeting:Speak(control)
+-- The target confirmed last, and in which fight (nil out of combat): the next targeting list
+-- opens with the cursor on it, so a second attack on the same enemy is one Enter away.
+local lastTarget = nil
+
+function Targeting:Open()
+    ListScreen.Open(self)
+    if self.picking or #self.controls == 0 or not lastTarget or lastTarget.combat ~= Combat.Current() then return end
+    for i, t in ipairs(self.targets) do
+        if t.uuid == lastTarget.uuid then
+            self.index = i
+            self:Speak(self.controls[i], true) -- after the list's own announcement
+            return
+        end
+    end
+end
+
+-- Focus = hover: speak the target at once (queued when the list itself was just announced), then
+-- the game's preview for it.
+function Targeting:Speak(control, queued)
+    self.blindConfirm = nil -- another target read: its own aim first
     local t = self.targets[self.index]
-    Speech.Say(control.Describe(), { interrupt = true })
+    Speech.Say(control.Describe(), { interrupt = not queued })
     if not t then return end
     local index = self.index
     local centred, turned, told = false, false, false
@@ -254,7 +288,8 @@ function Targeting:Activate(aimed)
             return
         end
     end
-    if not aimed and not Activate.IsHovering(t.uuid) then
+    local blind = self.blindConfirm == t.uuid -- the player chose the command after a failed aim
+    if not aimed and not blind and not Activate.IsHovering(t.uuid) then
         -- Aim at it first: the portrait command acted on whoever the cursor was over (Sacred
         -- Flame meant for Azak hit Roah, 2026-09-25). Only when it cannot be aimed at is the
         -- command used.
@@ -265,7 +300,7 @@ function Targeting:Activate(aimed)
         end)
         return
     end
-    if t.world then
+    if t.world and t.uuid ~= self.me then
         failed("reason_no_cursor") -- no view model: only a click on it can confirm
         return
     end
@@ -276,6 +311,16 @@ function Targeting:Activate(aimed)
         return
     end
     self.parkedForCommand = false
+    -- In combat the command may make the game walk the character first, unseen and unannounced:
+    -- Shadowheart's Guiding Bolt at a hidden Haseid walked her past him into the other bandits
+    -- (attack of opportunity; chapel ruins, 2026-09-26). So after a failed aim the player is told
+    -- and a second Enter uses it.
+    if Combat.Current() and t.uuid ~= self.me and not blind then
+        self.blindConfirm = t.uuid
+        Speech.Say(L("target_blind_confirm", { name = t.name or "?" }), { interrupt = true })
+        return
+    end
+    self.blindConfirm = nil
     local before = self:Before()
     if not Combat.TargetArmedAction(t.uuid) then
         failed("reason_unavailable")
@@ -321,6 +366,9 @@ end
 -- once more first.
 function Targeting:AfterConfirm(result, t, failed, retry)
     if result ~= "done" then self.confirming = false end
+    if (result == "done" or result == "more") and t and t.uuid ~= self.me then
+        lastTarget = { uuid = t.uuid, combat = Combat.Current() }
+    end
     if result == "done" then
         self:Close()
     elseif result == "more" then
@@ -379,12 +427,19 @@ end
 
 function Targeting:OnKey(combo)
     if combo == "ESCAPE" and #self.levels == 0 then
-        -- The game's ActionCancel; with nothing armed Escape would open the game menu.
-        if Hotbar.Armed() then Activate.CancelArmed() end
+        -- The game's ActionCancel; with nothing armed Escape would open the game menu. The
+        -- cursor goes off the world first: resting on an enemy after a failed aim, the game's
+        -- hover preview sets the same ActiveSlot as an armed action, and the Escape sent for it
+        -- opened the game menu (Magic Missile "too far" on Mari, chapel ruins, 2026-09-26).
         Speech.Say(L("cancelled"), { interrupt = true })
-        self:Close()
+        self.cancelling = true
+        Activate.Park(function()
+            if Hotbar.Armed() then Activate.CancelArmed() end
+            self:Close()
+        end)
         return true
     end
+    if self.cancelling then return true end -- keys while the cancel settles
     if combo == "SPACE" then return false end -- the game's end turn stays the game's
     return ListScreen.OnKey(self, combo)
 end

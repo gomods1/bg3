@@ -73,7 +73,12 @@ end
 local function spellsOf(b)
     local book = Game.Read()[b]
     local out = {}
-    for _, sp in ipairs(book and book.spells or {}) do out[#out + 1] = spellControl(b, sp) end
+    for _, sp in ipairs(book and book.spells or {}) do
+        -- one section per spell level (NAVIGATION.md: Tab between them)
+        local c = spellControl(b, sp)
+        c.section = (sp.level or 0) == 0 and L("spell_choice_cantrips") or L("spells_of_level", { level = sp.level })
+        out[#out + 1] = c
+    end
     return out
 end
 

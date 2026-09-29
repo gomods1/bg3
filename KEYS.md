@@ -29,6 +29,7 @@ Menu commands (in menu order; each can get a direct key in config.json, `keys.<i
 | Actions and attacks (`actions`): the hotbar, items included (count left); Enter arms one, a potion is drunk at once | in game (HUD) | confirmed (Tav, Lae'zel; through the menu: Jump, Cleave, Fire Bolt, main-hand attack, healing potion, scroll of revivify armed) |
 | Move (`move`): the place cursor with nothing armed; Enter walks there (in combat the game's preview says the meters it costs) | in game, nothing armed | confirmed (Lae'zel in combat: "uses 4 meters of movement, 1 left", walked 4.4 m) |
 | Turn order (`turnOrder`): HP, relation, distance, who is acting | in combat | confirmed in the menu list; list itself confirmed with the old key |
+| Party members (`party`): the party in the order of the game's F1-F4 ("1: Tav, controlado, 32 de 32 puntos de golpe", "2: Gale, 20 de 20..., 2 metros, detrás, Voracidad arcana"), "acting now" in combat; Enter takes control of that character (the portrait's own command), Ctrl+D reads the full status line | in game (HUD) | confirmed (Blighted Village, session 8: three members listed in F-key order, Enter on Corazón Sombrío -> "Ahora Corazón Sombrío" 0.2 s later; in combat untested) |
 | Reactions settings (`reactions`): each party member's reactions, always / ask / never (the game's L panel); Left/Right or Enter change, Ctrl+D describes | in game (HUD) | confirmed (Tav's attack of opportunity: ask -> never -> always -> ask) |
 | Spell book (`spellbook`): the selected character's class spells by level with the game's titles and their state (prepared, not prepared, always prepared); Enter prepares / unprepares, Ctrl+D describes | in game, the character has a class spell book | confirmed (Gale: Magic Missile and Shield prepared, Witch Bolt unprepared; "All 5 spells to prepare are chosen: unprepare one first") |
 | Character status (`status`): HP, action, bonus action, reaction, class resources, movement | a character is selected | confirmed with the old key (Tav, Lae'zel) |
@@ -72,13 +73,15 @@ These are claimed only while the screen or list is in front; elsewhere they stay
 
 | Key | Where | Action | Status |
 |---|---|---|---|
-| Up / Down | every list screen (menus, options, message boxes, character creation, loot, mod lists) | previous / next item | confirmed |
+| Tab / Shift+Tab | every list with sections (NAVIGATION.md, since 2026-09-29): History (events, combat log, dialogue), Nearby and Farther (everything, then each kind), the mod menu (its groups), Actions (the hotbars), Spell book (the spell levels), loot from several containers | the next / previous section, "name, N items" said first; a list with one section leaves Tab to the game | offline tests (tests/lua/sections_test.lua); in game untested |
+| Up / Down | every list screen (menus, options, message boxes, character creation, loot, mod lists) | previous / next item, inside the section (no wrap) | confirmed (inside a section: untested) |
 | Home / End | list screens | first / last item | confirmed |
 | Enter, Space, Numpad Enter | list screens | activate (button, choice, open section) | confirmed (Enter, Space); Numpad Enter untested |
 | Left / Right | option rows, tick boxes, sliders, character creation abilities and racial bonuses | change the value | confirmed |
+| Left / Right | every list, on an item without a value | previous / next item, like Up / Down (since 2026-09-29; before, the key went to the game). Difficulty keeps the game's own Left / Right | untested |
 | Shift+Left / Shift+Right | sliders | small step | untested |
 | Tab / Shift+Tab | options | next / previous tab | confirmed (every tab) |
-| Left / Right, Tab / Shift+Tab | message boxes | move between buttons | confirmed (Left/Right) |
+| Up / Down, Left / Right | message boxes | move between buttons; Tab / Shift+Tab say the button again (one section) | confirmed (Left/Right, before 2026-09-29); Tab untested |
 | Escape / Backspace | a sub-list (character creation section) | back to the parent list | confirmed (Escape) |
 | Escape | Nearby, Map markers, Turn order, Actions lists | close the list | confirmed |
 | Up / Down | dialogue, when the options are up | read the options | confirmed |
@@ -114,7 +117,7 @@ These are claimed only while the screen or list is in front; elsewhere they stay
 | Up / Down, Enter, Escape | mod menu | choose, run, close | confirmed |
 | Space | in game, combat, the party's turn, an action or bonus action left | first press says what is left ("Still left: Acción adicional. Space again ends the turn."), a second press within 8 s ends the turn (the game's key). Off with config `combat.confirmEndTurn` | confirmed (Tav, Lae'zel) |
 | Ctrl+R | in game (HUD only) | the controlled character's status | untested |
-| Left / Right | Nearby | show one kind at a time (characters, containers, things to pick up, doors, other) | confirmed (Right) |
+| Tab / Shift+Tab | Nearby, Farther | the sections: everything (nearest first), then one kind at a time (characters, containers, things to pick up, doors, traps, other); replaced Left / Right 2026-09-29 | untested |
 | Enter | character panel (the game's I): Inventory / Equipment / Character sheet sections | open the section | confirmed |
 | Enter | character panel, an inventory item | use it as a double click does (equip, drink...) | confirmed (hat equipped) |
 | Enter | character panel, an equipment slot | unequip | confirmed (hat) |
@@ -123,7 +126,7 @@ These are claimed only while the screen or list is in front; elsewhere they stay
 | Ctrl+D | level up, a feature | its description | untested |
 | Escape | level up | the game's: close without levelling | confirmed |
 | Up / Down | History | read the lines, newest first | confirmed |
-| Left / Right | History | switch buffer (empty ones skipped) | confirmed (Right) |
+| Tab / Shift+Tab | History | switch buffer (empty ones left out); replaced Left / Right 2026-09-29 | confirmed 2026-09-29 at the main menu, keys sent through the router from the dev channel ("Historial. Sucesos, 3 elementos...", Tab: "Registro de combate, 1 elemento", wraps; Down stops at the section end) |
 | Escape | History | close | confirmed |
 | Ctrl+D | dialogue options | what the answer's tags mean (the game's tooltip, e.g. the class tag) | confirmed (Bárbaro tag) |
 | Enter, Space, Numpad Enter | dice roll screen (skill checks) | roll, then after the result go on (the game's command for its Enter binding: a real Enter did nothing there) | confirmed (Strength check) |
@@ -142,7 +145,7 @@ Confirmed means pressed with the mod running and the effect checked.
 | Escape | Close options (Back), skip videos, finish tutorial popups, close loot, cancel | confirmed (options, videos, tutorial, loot, map) |
 | 1 to 9, 0 (number row) | Choose a dialogue answer directly | confirmed (answer 3) |
 | Space | End turn in combat | confirmed |
-| F1 to F4 | Select party member 1 to 4 (the mod says who, with the status in combat) | confirmed (F2 -> Lae'zel, F1 -> Tav) |
+| F1 to F4 | Select party member 1 to 4 (the mod says who, with the status in combat). Since session 8 the switch is said at once after the player's own key (before: after a 0.8 s quiet wait that tells it from the game's own switch at the start of the party's turn) | confirmed (F2 -> Lae'zel, F1 -> Tav; session 8: F2 -> "Ahora Gale" within the key press, F1 -> "Ahora Tav" 0.3 s later) |
 | F5 | Quick save | confirmed |
 | F8 | Quick load | confirmed |
 | M | Map | confirmed (opens; the map screen itself is not made accessible yet) |

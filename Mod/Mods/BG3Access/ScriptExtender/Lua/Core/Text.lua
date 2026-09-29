@@ -12,7 +12,7 @@ function Text.Clean(s)
     s = s:gsub("([^%.])%.%.$", "%1."):gsub("([^%.])%.%.([^%.])", "%1.%2")
     -- "Tav: : He oído gritos" (a template's "[1]: [2]" where the line brings its own colon).
     s = s:gsub(":%s*:", ":")
-    s = s:gsub("[ \t]+", " "):gsub("\n%s*\n+", "\n"):gsub("^%s+", ""):gsub("%s+$", "")
+    s = s:gsub("[ \t]+", " "):gsub("\n%s*\n+", "\n"):gsub(" ?\n ?", "\n"):gsub("^%s+", ""):gsub("%s+$", "")
     if s == "" then return nil end
     return s
 end

@@ -18,6 +18,8 @@ local Speech = Ext.Require("Core/Speech.lua")
 local Buffers = Ext.Require("Core/Buffers.lua")
 local Config = Ext.Require("Core/Config.lua")
 local Log = Ext.Require("Core/Log.lua")
+local Poll = Ext.Require("Core/Poll.lua")
+local Recent = Ext.Require("Core/Recent.lua")
 local Router = Ext.Require("Screens/Router.lua")
 
 local Narrator = {}
@@ -34,7 +36,7 @@ local seen = nil      -- entries already handled; nil until the first poll sets 
 -- 7 puntos de golpe." and "Asalto de combate 3." with another line between, 2026-09-25): a line
 -- equal to one taken within REPEAT_MS is dropped.
 local REPEAT_MS = 1500
-local recent = {}     -- text -> when it was taken
+local recent = Recent.New(REPEAT_MS)
 local lastEntryAt = 0
 local unit = nil      -- the unit being built: { head = entry?, results = { entries } }
 local group = nil     -- gathered units of one actor: { actor, units = { } }
@@ -95,27 +97,21 @@ end
 -- A bark said again within BARK_REPEAT_MS is not spoken again (still in the History buffer): Volo
 -- sings his ten lines over and over, a new line every 5 s (goblin camp, 2026-09-25).
 local BARK_REPEAT_MS = 5 * 60 * 1000
-local barkSaidAt = {}
+local barksSaid = Recent.New(BARK_REPEAT_MS)
 local function barkWanted(e)
     local mode = Config.Get("speech.barks") or "all"
     if mode == "none" then return false end
     if mode == "party" and not (e.speaker ~= nil and Player.PartyNames()[e.speaker] == true) then return false end
-    local now = Ext.Timer.MonotonicTime()
-    local last = barkSaidAt[e.text]
-    if last and now - last < BARK_REPEAT_MS then return false end
-    barkSaidAt[e.text] = now
-    return true
+    -- A bark that keeps coming back within the window stays quiet as long as it keeps coming.
+    return not barksSaid:Take(e.text)
 end
 
 -- Outside combat the same line again within BARK_REPEAT_MS is not spoken again either: a goblin
 -- throwing rocks for fun ("Skrut: Lanzar roca.") every few seconds by Minthara, 2026-09-25.
-local lineSaidAt = {}
+local linesSaid = Recent.New(BARK_REPEAT_MS)
 local function repeatedOutsideCombat(e)
     if CombatState.Current() then return false end
-    local now = Ext.Timer.MonotonicTime()
-    local last = lineSaidAt[e.text]
-    lineSaidAt[e.text] = now
-    return last ~= nil and now - last < BARK_REPEAT_MS
+    return linesSaid:Take(e.text)
 end
 
 local function take(e)
@@ -163,11 +159,8 @@ local function readNew()
         -- Hits and misses repeat for real: Scorching Ray's two rays of 6 were said as one
         -- (torture room, 2026-09-25).
         local mayRepeat = e.kind == "damage" or e.kind == "miss"
-        if e.text and e.text ~= "" and (mayRepeat or not (recent[e.text] and now - recent[e.text] < REPEAT_MS)) then take(e) end
-        if e.text then recent[e.text] = now end
-    end
-    for text, at in pairs(recent) do
-        if now - at >= REPEAT_MS then recent[text] = nil end
+        local repeated = e.text and recent:Take(e.text, now)
+        if e.text and e.text ~= "" and (mayRepeat or not repeated) then take(e) end
     end
     seen = count
     lastEntryAt = now
@@ -191,13 +184,7 @@ function Narrator.Flush()
 end
 
 function Narrator.Start()
-    local last = 0
-    Ext.Events.Tick:Subscribe(function()
-        local now = Ext.Timer.MonotonicTime()
-        if now - last < POLL_MS then return end
-        last = now
-        Log.Guard("combat narrator", poll)
-    end)
+    Poll.Every("combat narrator", POLL_MS, poll)
 end
 
 return Narrator

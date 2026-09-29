@@ -5,6 +5,7 @@
 local Ui = Ext.Require("Game/Ui.lua")
 local Vm = Ext.Require("Game/Vm.lua")
 local Characters = Ext.Require("Game/Characters.lua")
+local Player = Ext.Require("Game/Player.lua")
 
 local Combat = {}
 
@@ -70,8 +71,10 @@ end
 -- portrait does with an action armed. Verified 2026-09-24: with the main-hand attack armed, the
 -- character walked to the imp and attacked it (action spent, imp killed); no mouse involved.
 -- Returns ok.
+-- Out of combat a party member has no combatant view model: their portrait's (the player's
+-- AssignedCharacters) is used, as a click on the portrait would.
 function Combat.TargetArmedAction(uuid)
-    local ch = combatantVm(uuid)
+    local ch = combatantVm(uuid) or Player.MemberVm(uuid)
     if not ch then return false end
     return Vm.Run(Vm.WidgetDc("HotBar"), "TargetGameobjectCommand", ch)
 end

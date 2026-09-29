@@ -4,8 +4,132 @@ Read this first, then `PLAYTEST.md` (what was exercised with which character and
 not, and which assumptions may break elsewhere) and `KEYS.md` (every shortcut, mod and game,
 confirmed or not).
 
-**Next session starts with "Next session: start here" below (jumping on routes first; user,
-2026-09-25).**
+**Next session starts with "Next session: start here (written 2026-09-26, end of session 9)"
+in the Session 9 section.**
+
+## Session 9 (2026-09-26): open items, then the teahouse
+
+- **Item 1 (jumps on routes) — the teahouse was never a jump.** The engine's route exists (1088
+  checkpoints, 270 m east and down the village's hill, along the river); the default
+  `SearchHorizon` (32000 nodes) stopped the search. Paths.Find now asks for 256000: failures cost
+  48-59 ms (the search ends when reachable ground runs out). The goblin camp and Halsin's marker
+  were "unreachable" from the village for the same reason. Found with a flood fill of the AI grid
+  (dev probe: both ends one walkable area) and routes planned from points along it
+  (`SourceAdjusted`). The trip then reached the Sunlit Wetlands and the teahouse by markers.
+  A general jump search is still unbuilt: no place needing a jump is known yet (the grid probe
+  found only water pockets near the teahouse).
+- **Camera squeezed against scenery**: beside a boulder the camera sat 2.4 m from Tav (the screen
+  all rock, every ground click refused, the trip gave up). Camera.Distance / Camera.Unblock: a trip
+  step with the camera under 6 m zooms out (PgDn) and turns it a quarter at a time; verified the
+  zoom keys (600 ms of PgUp 13.1 -> 4.3 m, PgDn back to 13.1) and the turn (2.4 -> 13.1 m).
+  The retried trip got past that spot (not re-heard at the same boulder).
+- **Why an action is unavailable** (item 7, Arcane Recovery): the actions list now says why
+  ("Furia: corazón de oso, acción adicional, no disponible, solo en combate"; "Ferocidad
+  imparable, ... no disponible, solo en furia"; missing resources "sin Espacio de conjuro").
+  From the spell's Requirements (Combat, Not), RequirementConditions (HasStatus('X') / status
+  groups like SG_Rage) and the slot's CostSummary (Value = left, MaxValue = cost). Arcane Recovery
+  costs an ArcaneRecoveryPoint (refilled by a long rest only) and refuses combat: the game's rule.
+- **Self as a target out of combat**: Lesser Restoration listed the caster ("Corazón Sombrío,
+  tú") and cast on her through the portrait command (Combat.TargetArmedAction falls back to the
+  party member's portrait VM). Verified on Shadowheart.
+- Campaign: the brothers' scene on the road (Ethel exposed, "Salva a Mayrina"), an Investigation
+  roll (failed), the teahouse talk (Ethel's eye deal declined). A hidden spike trap on the way
+  gave Gale and Shadowheart "Herida abierta" -> "En descomposición" -> "Carne podrida"
+  (HAG_FLESHROT: vulnerable to all damage; SG_Disease, not cured by rest): Shadowheart prepared
+  Lesser Restoration from the spell book and cured both. Saves 97-99.
+- **Feats in level up (M6)**: the level up lists "Dote: ninguno"; Enter opens the game's 41
+  feats (Ctrl+D describes; unavailable ones say why: "no disponible: Competencia con [1]" — the
+  game's requirement text keeps an unfilled [1]); choosing one adds its own rows: ability points
+  ("Puntos de característica, 0 de 1": Right/Left on "Fuerza 17" -> "Fuerza 18, más 1 ... completo"),
+  feat skills (Skilled: the game preselects 3; skills the character has read "con competencia"),
+  feat passives (Elemental Adept: "Versado en un elemento: ácido elegido ... completo"). Verified
+  on a throwaway branch (900 XP given to Tav from the dev console, then save 99 reloaded): Atleta
+  with Strength, Accept -> "Tav: ha alcanzado el nivel 4", Strength 18. **Not working: feat spells**
+  (Magic Initiate): the rows are read ("Trucos, 0 de 2"), but the game's "Cambiar conjuro" toggle
+  ignores SetProperty(IsChecked) and a mouse click, and its spell grid sits in a third column
+  beyond a 16:10 screen; showing the grid by hand made its buttons exist off screen. Open.
+  Level 4 in the real campaign is 854 XP away.
+- Harness: `wait-log` waits for a NEW line and takes a regex (it matched the whole file, and
+  `\|` literally); backup numbers past 99 parse.
+
+- Later in session 9 (saves 100-103): Ethel attacked in the teahouse (save 100 first): she is 104/112
+  HP, invisible, and summons four redcaps: far beyond a level-3 party; reloaded, left for later.
+  Then fast travel to the Roadside Cliffs, the chapel ruins ("Explora las ruinas"): bandit bodies
+  outside looted (Taman: thieves' tools, trap kit), the outer door and an inner door picked
+  (Sleight of Hand checks read and rolled), Andorn killed, then five bandits (Mari, Barton, Cefrey,
+  Torgga, Haseid) in 8 rounds by keyboard (Gale and Shadowheart downed once each, Help revived
+  them). Fixed on the way: "Has usado: ." now reads the banner ("Has usado: Herramientas de
+  ladrón"); Escape in targeting after a failed aim no longer opens the game menu (the cursor is
+  parked before the cancel: a hover preview reads as armed); in combat, when the cursor cannot
+  reach a target the mod now asks for a second Enter before the game's command (it walked
+  Shadowheart past Haseid into an opportunity attack; **the second-Enter path is untested**);
+  a party member at 0 HP out of combat is a target again (Help on Shadowheart).
+
+### Next session: start here (written 2026-09-26, end of session 9)
+Where the game is: save `103_chapel_bandits_won` (+ looting afterwards, not saved): the chapel
+ruins' bandit hideout (inside coordinates around -172, 20, -301), party level 3 (1946 XP in total, 1046 of the 1800 that level 3 needs: about 750 to level 4), rested by a short rest.
+I was walking to the last locked door of the hideout (server: DOOR_Single_Dungeon_Abbey, 28 m
+from the loot chests, IsLocked 1, **not Known**, and it is missing from Nearby's door filter at
+that distance — check whether Nearby/Doors leave out doors that are not Known: that would break
+the "nothing left out" rule). Tav now has thieves' tools; pick it, then find "un acceso a las
+ruinas" (the quest's current objective); two wall levers stand 4 m up on a balcony by the first
+inner door (unknown purpose; save before pulling). An inactive explosive mine (OffStage) is near
+the entrance.
+Open items, in order:
+1. Verify the second-Enter safety (targeting in combat, cursor cannot reach) and the Escape fix
+   again in a fight. Aiming is still slow: 65 s to aim at a downed Gale lying flat, then missed;
+   25 s and a miss on Haseid (item 2 of the old list).
+2. The Move place cursor said "no está en pantalla" for points toward an enemy 14 m away (the
+   camera did not follow): make the place cursor turn/center the camera.
+3. In combat the preview "camina antes 9 metros, quedan 0 ... No te queda suficiente movimiento"
+   came with 9 of 9 movement left: probably a longer path capped at 9; say so better.
+4. Feat spells (Magic Initiate) in level up: see above. Level 4 is near.
+5. Ethel's teahouse: come back at level 4-5 (she flees into her lair behind the fireplace's
+   sliding walls; Mayrina there). Old list items 3-8 below still apply (trade stacks: Shift is the
+   game's SplitItemToggle, UIData.SplitItemData + ApplySplitCommand in SplitItem.xaml, untested).
+Harness notes: don't chain Space presses to end turns (each Space pair ends one character's
+turn and moves to the next; a loop ended Gale's and Shadowheart's turns unused); `game.py back`
+before modact; after "Coger todo" the container closes itself (no Escape).
+
+## Session 8 (2026-09-26): review and groundwork, no story progress
+
+A review pass over the code (the user asked for improvements before the next steps), then the
+changes it led to. Nothing in the test game moved; saves 96 and 66 were loaded for checks.
+- **Offline tests**: `python tools/test_lua.py` runs `tests/lua/*_test.lua` in Lua 5.4 through
+  lupa (pip, PyPI) with a stub of the SE API: 38 cases for Strings (plural rules of ru/pl/fr/ja,
+  lists, sentences, numbers, fallbacks), Text, Keys (both layers, claimed releases), Poll, Recent,
+  Words.Status, and one that compiles every module (a syntax error no longer waits for the game).
+- **Core/Poll**: the six Tick pollers (router, tracker, narrator, notices, stealth, story timers)
+  share one subscriber with per-poller intervals and cost statistics (`BG3Access.Poll.Report()`
+  on the dev channel). Measured on the Blighted Village HUD over 20 s: all six together about
+  5 ms per second (notices the largest at 1.5 ms per call every 250 ms). Nothing to optimise.
+- **Core/Recent** replaces three hand-rolled "said within N ms" maps in the narrator (log
+  repeats, barks, out-of-combat repeats). Behaviour change: a bark that keeps coming back inside
+  its 5-minute window now stays quiet as long as it keeps coming (before, it was said again
+  5 minutes after its first time).
+- **Party list** (mod menu "Miembros del grupo", Combat/Party): the party in F1-F4 order with
+  HP, statuses, distance, "acting now" in combat; Enter takes control (Player.Select), Ctrl+D the
+  full status. Verified with three members (save 96); F-key positions match the list.
+- **Switch said at once**: a change of the controlled character right after a key the mod let
+  through (Keys.Observer) or after the mod's own selection (Player.OnSelect) skips the 0.8 s quiet
+  wait (Tracker.ExpectSwitch). Measured: F2 -> "Ahora Gale" within the press, F1 -> 0.3 s.
+- **Targeting**: the list ranks enemies, other characters, the party, then objects (the worg pens
+  entrance listed 104 targets, Birka the brawler 13th behind candles); it opens with the cursor on
+  the target confirmed last in the same fight (built, untested: Birka could not be aimed at from
+  the entrance, the fight was not started).
+- **Notices**: banners in the 5 s after any loading screen only set the baseline (a save from
+  another game read "Diario actualizado, Escapa del nautiloide" on load; verified gone on the next
+  load).
+- Text.Clean trims spaces around line breaks. Setup/Commands: `outOfCombat()` helper.
+- Observed, not fixed: Escape in a targeting list whose action the game had already dropped
+  (after a failed aim) said "Cancelado" and the game menu opened as well (the mod's Escape should
+  have been swallowed; check whether the game acts on the key before SE's hook).
+- Harness: the Bash tool of this session runs sandboxed and cannot see the game window
+  (`game.py press` says "no game window"); PowerShell can. Lua/log commands work from both.
+
+### Next session: start here
+Unchanged from session 7: jumping on routes first (see below). Then verify in a fight: the party
+list in combat, the targeting order, the last-target start.
 
 ## Current state (session 7, 2026-09-25)
 

@@ -14,6 +14,8 @@ local DialogueGame = Ext.Require("Game/Dialogue.lua")
 local Nearby = Ext.Require("Exploration/Nearby.lua")
 local Markers = Ext.Require("Exploration/Markers.lua")
 local TurnOrder = Ext.Require("Combat/TurnOrder.lua")
+local Party = Ext.Require("Combat/Party.lua")
+local CombatTracker = Ext.Require("Combat/Tracker.lua")
 local ReactionSettings = Ext.Require("Combat/ReactionSettings.lua")
 local Actions = Ext.Require("Combat/Actions.lua")
 local Place = Ext.Require("Combat/Place.lua")
@@ -51,11 +53,20 @@ local function inCombat()
     return Router.InGame() and Combat.Current() ~= nil
 end
 
+local function outOfCombat()
+    return Router.InGame() and not Combat.Current()
+end
+
 function Setup.Register()
     Keys.Action("menu", function()
         local screen = Router.handler
         Router.PushModScreen(ModMenu.New(screen, Router.PopModScreen))
     end)
+    -- A change of the controlled character right after the player's own key (F1-F4, [ ]: the mod
+    -- lets them through) or after the mod's own selection is announced at once, not after the
+    -- quiet wait that tells it from the game's own switch at the start of the party's turn.
+    Keys.Observer = function() CombatTracker.ExpectSwitch() end
+    Player.OnSelect = function() CombatTracker.ExpectSwitch() end
 
     -- Combat
     Commands.Register({
@@ -83,6 +94,12 @@ function Setup.Register()
     Commands.Register({
         id = "turnOrder", group = "combat", available = inCombat,
         run = function() Router.OpenModScreen(TurnOrder.New(Router.CloseModScreen)) end,
+    })
+    -- The party in portrait order (the game's F1-F4); Enter takes control of one.
+    Commands.Register({
+        id = "party", group = "combat",
+        available = function() return Router.InGame() and #Player.Party() > 0 end,
+        run = function() Router.OpenModScreen(Party.New(Router.CloseModScreen)) end,
     })
     Commands.Register({
         id = "reactions", group = "combat", available = Router.InGame,
@@ -124,14 +141,14 @@ function Setup.Register()
     })
     Commands.Register({
         id = "shortRest", group = "exploration",
-        available = function() return Router.InGame() and not Combat.Current() and Camp.CanShortRest() end,
+        available = function() return outOfCombat() and Camp.CanShortRest() end,
         run = function()
             if not Camp.ShortRest() then Speech.Say(Strings.Get("not_available_here"), { interrupt = true }) end
         end,
     })
     Commands.Register({
         id = "longRest", group = "exploration",
-        available = function() return Router.InGame() and not Combat.Current() end,
+        available = outOfCombat,
         run = function()
             if not Camp.LongRest() then Speech.Say(Strings.Get("not_available_here"), { interrupt = true }) end
         end,
@@ -145,17 +162,17 @@ function Setup.Register()
     })
     Commands.Register({
         id = "explore", group = "exploration",
-        available = function() return Router.InGame() and not Combat.Current() end,
+        available = outOfCombat,
         run = function() Router.OpenModScreen(Explore.New(Router.CloseModScreen)) end,
     })
     Commands.Register({
         id = "places", group = "exploration",
-        available = function() return Router.InGame() and not Combat.Current() end,
+        available = outOfCombat,
         run = function() Places.Show(Router.OpenModScreen, Router.CloseModScreen) end,
     })
     Commands.Register({
         id = "signposts", group = "exploration",
-        available = function() return Router.InGame() and not Combat.Current() end,
+        available = outOfCombat,
         run = function() Signposts.Show(Router.OpenModScreen, Router.CloseModScreen) end,
     })
     Commands.Register({
@@ -168,12 +185,12 @@ function Setup.Register()
     })
     Commands.Register({
         id = "marks", group = "exploration",
-        available = function() return Router.InGame() and not Combat.Current() end,
+        available = outOfCombat,
         run = function() Marks.Show(Router.OpenModScreen, Router.CloseModScreen) end,
     })
     Commands.Register({
         id = "waypoints", group = "exploration",
-        available = function() return Router.InGame() and not Combat.Current() end,
+        available = outOfCombat,
         run = function() Router.OpenModScreen(Waypoints.New(Router.CloseModScreen)) end,
     })
     Commands.Register({

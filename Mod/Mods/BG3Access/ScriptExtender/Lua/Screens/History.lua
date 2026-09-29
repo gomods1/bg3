@@ -1,5 +1,6 @@
--- History (mod menu): the review buffers (Core/Buffers), newest line first. Up/Down read the lines,
--- Left/Right switch buffers (empty ones are skipped), Home/End jump, Escape closes. Opens on the
+-- History (mod menu): the review buffers (Core/Buffers), one section each (NAVIGATION.md): Tab /
+-- Shift+Tab switch between events, combat log and dialogue (empty ones are left out), Up/Down read
+-- the lines newest first, Home/End jump, Enter reads the line again, Escape closes. Opens on the
 -- buffer that fits what the player is doing (dialogue in a conversation, combat in a fight).
 local Buffers = Ext.Require("Core/Buffers.lua")
 local Speech = Ext.Require("Core/Speech.lua")
@@ -13,56 +14,41 @@ local History = ListScreen.Extend()
 
 -- start: the buffer to open on (falls back to the first non-empty one); onClose: gives the keys back.
 function History.New(start, onClose)
-    local self = setmetatable(ListScreen.New("(history)", ""), History)
+    local self = setmetatable(ListScreen.New("(history)", L("screen_history_title")), History)
     self.onClose = onClose
-    self.buffer = start
-    if #Buffers.Lines(start or "") == 0 then self.buffer = self:NextBuffer(0, 1) or Buffers.ORDER[1] end
-    self.title = self:BufferTitle()
+    self.start = start
     return self
-end
-
-function History:BufferTitle()
-    return L("screen_history", { buffer = L("buffer_" .. self.buffer), n = #Buffers.Lines(self.buffer) })
-end
-
--- The next non-empty buffer after position i in Buffers.ORDER going step (1 or -1), or nil.
-function History:NextBuffer(i, step)
-    local n = #Buffers.ORDER
-    for k = 1, n do
-        local j = ((i - 1 + step * k) % n) + 1
-        local name = Buffers.ORDER[j]
-        if name ~= self.buffer and #Buffers.Lines(name) > 0 then return name end
-    end
-    return nil
 end
 
 function History:Build()
     local out = {}
-    for i, text in ipairs(Buffers.Lines(self.buffer)) do
-        out[i] = Controls.Text(text)
+    for _, name in ipairs(Buffers.ORDER) do
+        local section = L("buffer_" .. name)
+        for _, text in ipairs(Buffers.Lines(name)) do
+            local c = Controls.Text(text)
+            c.section = section
+            c.buffer = name
+            out[#out + 1] = c
+        end
     end
     return out
 end
 
-function History:Switch(step)
-    local pos = 1
-    for i, name in ipairs(Buffers.ORDER) do
-        if name == self.buffer then pos = i end
-    end
-    local name = self:NextBuffer(pos, step)
-    if not name then
-        Speech.Say(L("history_no_other"), { interrupt = true })
+-- The first line of the start buffer (else of the first buffer with lines), with its section.
+function History:Open()
+    self:Refresh()
+    if #self.controls == 0 then
+        Speech.Say(L("screen_empty", { title = self.title }))
         return
     end
-    self.buffer = name
-    self.title = self:BufferTitle()
-    self.index = 0
-    self:Refresh()
-    Speech.Say(self:BufferTitle(), { interrupt = true })
-end
-
-function History:Summary()
-    return self:BufferTitle()
+    self.index = 1
+    for i, c in ipairs(self.controls) do
+        if c.buffer == self.start then
+            self.index = i
+            break
+        end
+    end
+    Speech.Say(Strings.Sentences({ self.title, self:SectionIntro(self.index), self.controls[self.index].Describe() }))
 end
 
 function History:Help()
@@ -70,8 +56,6 @@ function History:Help()
 end
 
 function History:OnKey(combo)
-    if combo == "LEFT" then self:Switch(-1) return true end
-    if combo == "RIGHT" then self:Switch(1) return true end
     if combo == "ESCAPE" then
         Speech.Say(L("closed"), { interrupt = true })
         if self.onClose then self.onClose() end

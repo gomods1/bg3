@@ -53,6 +53,26 @@ function Camera.Pitch()
     return math.deg(math.asin(math.max(-1, math.min(1, V[7]))))
 end
 
+-- The camera's position in the world (from the view matrix: -R^T t).
+function Camera.Position()
+    local cam = active()
+    if not cam then return nil end
+    local V = cam.ViewMatrix
+    local t1, t2, t3 = V[13], V[14], V[15]
+    return { -(V[1] * t1 + V[2] * t2 + V[3] * t3), -(V[5] * t1 + V[6] * t2 + V[7] * t3),
+        -(V[9] * t1 + V[10] * t2 + V[11] * t3) }
+end
+
+-- Meters from the camera to p, or nil. Against a rock or a wall the game pulls the camera in:
+-- 2.4 m from Tav beside a boulder in the Blighted Village (2026-09-26), where the usual view is
+-- 13 m; the screen then showed the rock and nothing of the way (every ground click refused). The
+-- zoom keys (PgUp/PgDn) did nothing there; a turn with E freed it.
+function Camera.Distance(p)
+    local c = Camera.Position()
+    if not c or not p then return nil end
+    return math.sqrt((c[1] - p[1]) ^ 2 + (c[2] - p[2]) ^ 2 + (c[3] - p[3]) ^ 2)
+end
+
 -- The game's tactical camera (its O key, ToggleTacticalCamera) looks nearly straight down:
 -- pitch -82 degrees against -52 to -56 for the usual view (measured 2026-09-25, worg pens).
 -- In tight interiors it shows what the usual view hides behind pillars and beams.
@@ -133,6 +153,34 @@ function Camera.CenterOn(p, onDone)
             Ext.Input.InjectKeyUp(NUDGE_KEY)
             Camera.Center(function() onDone(onScreen(p)) end)
         end)
+    end)
+end
+
+-- A camera closer than this to the character shows too little ground to aim at (fully zoomed
+-- out it was 13.1 m in the Blighted Village, 2026-09-26).
+Camera.CLOSE_METERS = 6
+local ZOOM_OUT_MS = 800      -- PgDn held: 600 ms took the zoom from 4.3 m back to 13.1 m
+local UNBLOCK_TURNS = 3
+
+-- When the camera is closer than CLOSE_METERS to p (the player zoomed in, or scenery pressed it
+-- in): zoom out with the game's key, then turn it a quarter at a time until it stands back.
+-- onDone(tried).
+function Camera.Unblock(p, onDone)
+    local d = Camera.Distance(p)
+    if not d or d >= Camera.CLOSE_METERS then onDone(false) return end
+    local key = Input.ScancodeFor("CameraZoomOut") or "PAGEDOWN"
+    Ext.Input.InjectKeyDown(key)
+    Ext.Timer.WaitForRealtime(ZOOM_OUT_MS, function()
+        Ext.Input.InjectKeyUp(key)
+        local turns = 0
+        local function check()
+            local now, yaw = Camera.Distance(p), Camera.Yaw()
+            if not now or not yaw or now >= Camera.CLOSE_METERS or turns >= UNBLOCK_TURNS then onDone(true) return end
+            turns = turns + 1
+            local a = math.rad(yaw + 90)
+            Camera.TurnToward(math.cos(a), math.sin(a), check)
+        end
+        Ext.Timer.WaitForRealtime(300, check)
     end)
 end
 

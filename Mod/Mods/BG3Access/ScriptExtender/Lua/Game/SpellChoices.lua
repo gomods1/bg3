@@ -26,7 +26,9 @@ local RESULT_POLL_MS = 100
 local RESULT_WAIT_MS = 1500 -- the bridge clicks ~220 ms after the request; the VM follows
 
 -- A source is { widget = name, selectors = function() -> { selector VMs } (valid this tick),
--- ready = optional function(onReady(ok), onWait()) that waits until the widget takes clicks }.
+-- ready = optional function(onReady(ok), onWait()) that waits until the widget takes clicks,
+-- and, for panels that are not opened by a tab (a feat's spells): isOpen(i), open(i, onDone(ok)),
+-- selectButton / deselectButton (the buttons' x:Names in that panel) }.
 
 local function spellOf(ref)
     local sp = Vm.Get(ref, "Spell")
@@ -92,6 +94,7 @@ local function tabOf(source, i)
 end
 
 function SpellChoices.IsOpen(source, i)
+    if source.isOpen then return source.isOpen(i) end
     local s = selectorAt(source, i)
     local panel = Ui.FindElement(source.widget, "gameplaySubPanel")
     return Vm.Same(Vm.Get(panel, "DataContext"), s)
@@ -102,6 +105,13 @@ function SpellChoices.Open(source, i, onDone)
     onDone = onDone or function() end
     if SpellChoices.IsOpen(source, i) then
         onDone(true)
+        return
+    end
+    if source.open then
+        source.open(i, function(ok)
+            if not ok then onDone(false) return end
+            Timer.After(PANEL_OPEN_MS, function() onDone(SpellChoices.IsOpen(source, i)) end)
+        end)
         return
     end
     local tab = tabOf(source, i)
@@ -175,7 +185,7 @@ function SpellChoices.Toggle(source, i, key, onDone)
         onDone(false, "reason_choices_full")
         return
     end
-    local name = spell.selected and DESELECT_BUTTON or SELECT_BUTTON
+    local name = spell.selected and (source.deselectButton or DESELECT_BUTTON) or (source.selectButton or SELECT_BUTTON)
     SpellChoices.Open(source, i, function(open)
         if not open then
             onDone(false, "reason_gone")

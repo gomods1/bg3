@@ -65,12 +65,14 @@ function MessageBox:Help()
     return { L("help_message_box") }
 end
 
-local NEXT = { RIGHT = true, TAB = true }
-local PREV = { LEFT = true, ["SHIFT+TAB"] = true }
-
+-- The buttons are one section's items (NAVIGATION.md): Up/Down and Left/Right move between them
+-- (the list's own keys). Tab has no other section to go to: it says the button again, and never
+-- reaches the game behind the window.
 function MessageBox:OnKey(combo)
-    if NEXT[combo] then self:Move(1) return true end
-    if PREV[combo] then self:Move(-1) return true end
+    if combo == "TAB" or combo == "SHIFT+TAB" then
+        if self:Current() then self:Speak(self:Current()) else self:Move(1) end
+        return true
+    end
     return ListScreen.OnKey(self, combo)
 end
 

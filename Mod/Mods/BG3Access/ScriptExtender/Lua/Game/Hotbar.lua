@@ -20,6 +20,8 @@ local Vm = Ext.Require("Game/Vm.lua")
 local Ui = Ext.Require("Game/Ui.lua")
 local Player = Ext.Require("Game/Player.lua")
 local Spells = Ext.Require("Game/Spells.lua")
+local Combat = Ext.Require("Game/Combat.lua")
+local Entities = Ext.Require("Game/Entities.lua")
 
 local Hotbar = {}
 
@@ -99,6 +101,37 @@ function Hotbar.CanUse(b, s)
     local bar = bars()[b]
     local slot = bar and Vm.List(bar, "SlotList")[s]
     return Vm.Get(slot, "CanUse") == true
+end
+
+-- What keeps the action in bar b, slot s from being used, as data (nil when the slot is usable or
+-- gone): { statuses = { status ids or groups ("SG_Rage") the spell needs and the character lacks },
+-- combat = "only" | "never" | nil (the spell's Requirements: Rage needs a fight, Arcane
+-- Recovery refuses one), missing = { resource names (game text) } }. The slot's CostSummary lists
+-- one entry per cost with Value = what the character has left and MaxValue = the cost (verified
+-- 2026-09-26: Gale's level 1 slots 4 / 1, Tav's rages 3 / 1, the action point 1 / 1).
+function Hotbar.Shortfall(b, s)
+    local bar = bars()[b]
+    local slot = bar and Vm.List(bar, "SlotList")[s]
+    if not slot or Vm.Get(slot, "CanUse") == true then return nil end
+    local c = Vm.Get(slot, "Content")
+    local out = { missing = {} }
+    local id = c and slotAction(slot, c)
+    local rule = id and Spells.CombatRule(id)
+    local fighting = Combat.Current() ~= nil
+    if rule == "only" and not fighting then out.combat = "only" end
+    if rule == "never" and fighting then out.combat = "never" end
+    out.statuses = {}
+    local me = Entities.Controlled()
+    for _, status in ipairs(id and Spells.RequiredStatuses(id) or {}) do
+        if not Entities.HasStatus(me, status) then out.statuses[#out.statuses + 1] = status end
+    end
+    for _, cost in ipairs(Vm.List(c, "CostSummary")) do
+        local have, need = Vm.Get(cost, "Value"), Vm.Get(cost, "MaxValue")
+        if type(have) == "number" and type(need) == "number" and have < need then
+            out.missing[#out.missing + 1] = Vm.Text(cost, "Name") or tostring(Vm.Get(cost, "TypeId"))
+        end
+    end
+    return out
 end
 
 -- Why the controlled character cannot act, as the hotbar shows it ("No se puede controlar:
