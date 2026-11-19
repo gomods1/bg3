@@ -18,7 +18,14 @@ moment.
 - `Native/`: a Rust `version.dll` proxy that loads a small bridge DLL for speech
   (via the Prism library) and mouse input.
 - `install/`: player install and uninstall scripts.
-- `tools/`: development harness, deploy and packaging scripts.
+- `tools/`: development harness, deploy and packaging scripts. `python tools/fetch_tools.py`
+  downloads the pinned third-party tools (LSLib's Divine, Script Extender) from their official
+  releases. Game files are not in this repository: extract them from your own copy of the game.
+
+## Test saves
+
+About a hundred saves made while testing, from the nautiloid through act 1, so you can skip to a
+place or situation: see [SAVES.md](SAVES.md).
 
 Tested only on game build 4.1.1.7398727 (Patch 8 hotfix 9), Windows, with the game in Spanish.
 
